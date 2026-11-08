@@ -11,8 +11,8 @@
 (function (global) {
   "use strict";
 
-  const STORAGE_KEY_BOX = "pokeraid_max_optimizer_box_v2";
-  const STORAGE_KEY_FRIENDS = "pokeraid_max_optimizer_friends_v1";
+  const STORAGE_KEY_BOX = "pokeraid_max_optimizer_box_v3";
+  const STORAGE_KEY_FRIENDS = "pokeraid_max_optimizer_friends_v2";
 
   // Lista CPM interpolada (Nivel 15 a 51)
   const FULL_CPM_LIST = [
@@ -270,16 +270,12 @@
   }
 
   function loadRawBox() {
-    const db = getDB();
     try {
       const raw = global.localStorage.getItem(STORAGE_KEY_BOX);
       if (!raw) {
-        const initialBox = (db.starterDemoBox || []).map((p) => ({
-          ...p,
-          ownerId: "me"
-        }));
-        saveRawBox(initialBox);
-        return initialBox;
+        // La caja parte completamente vacía (0 Pokémon) a petición del usuario
+        saveRawBox([]);
+        return [];
       }
       const parsed = JSON.parse(raw);
       return Array.isArray(parsed) ? parsed : [];
@@ -319,14 +315,15 @@
     try {
       const raw = global.localStorage.getItem(STORAGE_KEY_FRIENDS);
       if (!raw) {
-        saveRawFriends(DEFAULT_DEMO_FRIENDS);
-        return DEFAULT_DEMO_FRIENDS;
+        // La lista de amigos parte limpia desde cero (0 amigos fijos)
+        saveRawFriends([]);
+        return [];
       }
       const parsed = JSON.parse(raw);
       return Array.isArray(parsed) ? parsed : [];
     } catch (err) {
       console.error("Error leyendo Amigos de localStorage:", err);
-      return DEFAULT_DEMO_FRIENDS;
+      return [];
     }
   }
 
@@ -496,13 +493,19 @@
 
     loadDemoBox() {
       const db = getDB();
+      // Si la lista de amigos está vacía, restauramos los 2 amigos demo para la demostración
+      let friends = this.getFriends();
+      if (friends.length === 0) {
+        saveRawFriends(DEFAULT_DEMO_FRIENDS);
+        friends = DEFAULT_DEMO_FRIENDS;
+      }
+
       const demoClone = (db.starterDemoBox || []).map((p) => ({
         ...p,
         ownerId: "me"
       }));
 
       // Añadimos también algunos Pokémon a amigos demo para que se aprecie la potencia del sistema
-      const friends = this.getFriends();
       if (friends.length > 0) {
         demoClone.push(
           {

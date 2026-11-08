@@ -12,7 +12,7 @@
 
   const state = {
     selectedBattleModeId: "dmax_t5",
-    selectedBossId: "eternatus",
+    selectedBossId: "palkia_dmax",
     selectedBossFast: "",
     selectedBossCharged: "",
     partyPowerEnabled: true,
@@ -378,10 +378,18 @@
       }
     }
 
+    const focusSpeciesSearchBtn = document.getElementById("btn-focus-species-search");
+    if (focusSpeciesSearchBtn) {
+      focusSpeciesSearchBtn.addEventListener("click", () => {
+        speciesSearchInput.focus();
+        speciesSearchInput.select();
+      });
+    }
+
     function renderSpeciesAutocompleteDropdown(matches) {
       if (!matches || matches.length === 0) {
         speciesDropdown.innerHTML = `
-          <div class="p-3 text-xs text-slate-400 text-center">
+          <div class="p-3 text-xs text-slate-400 text-center bg-slate-950">
             No se encontró ningún Pokémon con ese nombre o tipo.
           </div>
         `;
@@ -395,23 +403,23 @@
           const typesHtml = p.types.map((t) => renderTypeBadge(t)).join(" ");
           const maxTag =
             p.maxForm === "eternamax" || p.maxForm === "gigantamax"
-              ? `<span class="text-[10px] font-bold text-pink-400">🌀 G-Max</span>`
+              ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-pink-500/20 text-pink-300 border border-pink-500/40">🌀 G-Max</span>`
               : p.maxCapable
-              ? `<span class="text-[10px] font-semibold text-indigo-300">⚡ D-Max</span>`
+              ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">⚡ D-Max</span>`
               : "";
           return `
             <button
               type="button"
               data-pick-species="${p.id}"
-              class="w-full px-3.5 py-2.5 text-left hover:bg-cyan-500/15 active:bg-cyan-500/25 flex items-center justify-between gap-2 transition"
+              class="w-full px-4 py-3 text-left bg-slate-950 hover:bg-slate-800 active:bg-cyan-950/40 flex items-center justify-between gap-3 transition border-b border-slate-800/80 last:border-b-0 cursor-pointer"
             >
-              <div class="min-w-0">
-                <div class="flex items-center gap-1.5">
-                  <span class="font-mono text-[11px] text-slate-400">#${p.dex}</span>
-                  <span class="text-xs sm:text-sm font-bold text-white truncate">${p.name}</span>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="font-mono text-xs font-bold text-cyan-400">#${p.dex}</span>
+                  <span class="text-sm font-bold text-white">${p.name}</span>
                   ${maxTag}
                 </div>
-                <p class="text-[10px] text-slate-400 truncate">${p.roleTag || ""}</p>
+                <p class="text-[11px] text-slate-400 mt-0.5 truncate">${p.roleTag || ""}</p>
               </div>
               <div class="flex gap-1 shrink-0">${typesHtml}</div>
             </button>
@@ -424,13 +432,11 @@
       speciesDropdown.querySelectorAll("[data-pick-species]").forEach((btn) => {
         btn.addEventListener("click", () => {
           const pickedId = btn.getAttribute("data-pick-species");
-          const pickedSpecies = global.PokeBoxManager.getSpeciesById(pickedId);
-          speciesSearchInput.value = pickedSpecies ? pickedSpecies.name : "";
-          clearSpeciesBtn.classList.toggle("hidden", !speciesSearchInput.value);
-          populateSpeciesOptions("", false);
+          speciesSearchInput.value = "";
+          clearSpeciesBtn.classList.add("hidden");
+          speciesDropdown.classList.add("hidden");
           speciesSelect.value = pickedId;
           onSpeciesChange();
-          speciesDropdown.classList.add("hidden");
         });
       });
     }
@@ -439,6 +445,16 @@
       const speciesId = speciesSelect.value;
       const species = global.PokeBoxManager.getSpeciesById(speciesId);
       if (!species) return;
+
+      // Actualizar tarjeta visual de Especie Seleccionada
+      const cardDex = document.getElementById("species-selected-dex");
+      const cardName = document.getElementById("species-selected-name");
+      const cardTypes = document.getElementById("species-selected-types");
+      if (cardDex) cardDex.textContent = `#${species.dex}`;
+      if (cardName) cardName.textContent = species.name;
+      if (cardTypes) {
+        cardTypes.innerHTML = species.types.map((t) => renderTypeBadge(t)).join(" ");
+      }
 
       const fastSelect = document.getElementById("select-box-fast");
       const chargedSelect = document.getElementById("select-box-charged");
@@ -737,11 +753,61 @@
       return haystack.includes(q);
     });
 
+    if (allPokemon.length === 0) {
+      grid.innerHTML = `
+        <div class="col-span-full p-8 rounded-2xl bg-slate-950/90 border border-dashed border-cyan-500/30 text-center space-y-4 shadow-xl">
+          <div class="w-16 h-16 mx-auto rounded-full bg-cyan-500/10 border border-cyan-400/30 flex items-center justify-center text-3xl">
+            📦
+          </div>
+          <div class="space-y-1">
+            <h3 class="text-base font-bold text-white">Tu Caja está completamente vacía (0 Pokémon)</h3>
+            <p class="text-xs text-slate-400 max-w-md mx-auto">
+              La colección parte limpia de cero para que introduzcas tus propios Pokémon sin tener que borrar ejemplos previos. Usa el formulario de la izquierda con las plantillas rápidas de 1 toque, o pulsa "Cargar Demo" si quieres probar con un equipo de ejemplo.
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center justify-center gap-2 pt-2">
+            <button
+              type="button"
+              id="btn-box-focus-form"
+              class="px-4 py-2 rounded-xl text-xs font-bold bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 transition"
+            >
+              ➕ Añadir mi primer Pokémon
+            </button>
+            <button
+              type="button"
+              id="btn-box-load-demo-empty"
+              class="px-4 py-2 rounded-xl text-xs font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition"
+            >
+              ⚡ Cargar Pokémon Demo
+            </button>
+          </div>
+        </div>
+      `;
+      const focusBtn = document.getElementById("btn-box-focus-form");
+      if (focusBtn) {
+        focusBtn.addEventListener("click", () => {
+          const input = document.getElementById("input-species-search");
+          if (input) input.focus();
+        });
+      }
+      const demoBtn = document.getElementById("btn-box-load-demo-empty");
+      if (demoBtn) {
+        demoBtn.addEventListener("click", () => {
+          global.PokeBoxManager.loadDemoBox();
+          populateOwnerSelectors();
+          renderMyBoxCards();
+          runOptimizerCalculation();
+          showNotification("Caja demo cargada correctamente", "success");
+        });
+      }
+      return;
+    }
+
     if (filtered.length === 0) {
       grid.innerHTML = `
         <div class="col-span-full p-6 sm:p-8 rounded-2xl bg-slate-950/80 border border-dashed border-slate-700 text-center space-y-2">
-          <p class="text-sm font-bold text-slate-300">No se encontraron Pokémon en esta selección</p>
-          <p class="text-xs text-slate-400">Guarda un Pokémon con el formulario o pulsa <strong>"⚡ Demo"</strong> arriba a la derecha.</p>
+          <p class="text-sm font-bold text-slate-300">No se encontraron Pokémon con los filtros actuales</p>
+          <p class="text-xs text-slate-400">Prueba a limpiar la búsqueda o cambiar el filtro de etiqueta.</p>
         </div>
       `;
       return;
@@ -903,15 +969,23 @@
     }
 
     const featuredBossIds = [
+      "palkia_dmax",
+      "dialga_dmax",
       "eternatus",
       "duraludon_gmax",
-      "eternatus_eternamax",
-      "groudon_primal",
+      "machamp_gmax",
       "rayquaza_mega",
-      "rillaboom_gmax",
-      "gengar_gmax",
+      "groudon_primal",
       "mewtwo"
     ];
+
+    const focusBossSearchBtn = document.getElementById("btn-focus-boss-search");
+    if (focusBossSearchBtn) {
+      focusBossSearchBtn.addEventListener("click", () => {
+        bossSearchInput.focus();
+        bossSearchInput.select();
+      });
+    }
 
     function renderBossQuickChips() {
       if (!bossQuickChips) return;
@@ -924,7 +998,7 @@
             <button
               type="button"
               data-quick-boss="${p.id}"
-              class="px-2.5 py-1 rounded-full text-[11px] font-bold whitespace-nowrap transition shrink-0 border ${
+              class="px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition shrink-0 border ${
                 isSelected
                   ? "bg-cyan-500/25 text-cyan-200 border-cyan-400 shadow-sm"
                   : "bg-slate-950 text-slate-400 border-slate-800 hover:text-slate-200"
@@ -950,6 +1024,16 @@
       state.selectedBossId = boss.id;
       populateBossSelectOptions(bossCandidates);
       bossSelect.value = boss.id;
+
+      // Actualizar tarjeta visual de Jefe Seleccionado
+      const cardDex = document.getElementById("boss-selected-dex");
+      const cardName = document.getElementById("boss-selected-name");
+      const cardTypes = document.getElementById("boss-selected-types");
+      if (cardDex) cardDex.textContent = `#${boss.dex}`;
+      if (cardName) cardName.textContent = boss.name;
+      if (cardTypes) {
+        cardTypes.innerHTML = boss.types.map((t) => renderTypeBadge(t)).join(" ");
+      }
 
       if (Array.isArray(boss.defaultBossModes) && boss.defaultBossModes.length > 0) {
         if (!boss.defaultBossModes.includes(state.selectedBattleModeId)) {
@@ -989,7 +1073,7 @@
 
       if (matches.length === 0) {
         bossDropdown.innerHTML = `
-          <div class="p-3 text-xs text-slate-400 text-center">
+          <div class="p-3 text-xs text-slate-400 text-center bg-slate-950">
             No se encontró ningún Jefe con "${val}".
           </div>
         `;
@@ -998,18 +1082,27 @@
           .slice(0, 10)
           .map((p) => {
             const typesHtml = p.types.map((t) => renderTypeBadge(t)).join(" ");
+            const maxTag =
+              p.maxForm === "eternamax" || p.maxForm === "gigantamax"
+                ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-pink-500/20 text-pink-300 border border-pink-500/40">🌀 G-Max</span>`
+                : p.maxCapable
+                ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">⚡ D-Max</span>`
+                : p.isMega
+                ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">🔥 Mega</span>`
+                : "";
             return `
               <button
                 type="button"
                 data-pick-boss="${p.id}"
-                class="w-full px-3.5 py-2.5 text-left hover:bg-cyan-500/15 active:bg-cyan-500/25 flex items-center justify-between gap-2 transition"
+                class="w-full px-4 py-3 text-left bg-slate-950 hover:bg-slate-800 active:bg-cyan-950/40 flex items-center justify-between gap-3 transition border-b border-slate-800/80 last:border-b-0 cursor-pointer"
               >
-                <div class="min-w-0">
-                  <div class="flex items-center gap-1.5">
-                    <span class="font-mono text-[11px] text-slate-400">#${p.dex}</span>
-                    <span class="text-xs sm:text-sm font-bold text-white truncate">${p.name}</span>
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="font-mono text-xs font-bold text-cyan-400">#${p.dex}</span>
+                    <span class="text-sm font-bold text-white">${p.name}</span>
+                    ${maxTag}
                   </div>
-                  <p class="text-[10px] text-slate-400 truncate">${p.roleTag || ""}</p>
+                  <p class="text-[11px] text-slate-400 mt-0.5 truncate">${p.roleTag || ""}</p>
                 </div>
                 <div class="flex gap-1 shrink-0">${typesHtml}</div>
               </button>
@@ -1023,9 +1116,9 @@
       bossDropdown.querySelectorAll("[data-pick-boss]").forEach((btn) => {
         btn.addEventListener("click", () => {
           const pickedId = btn.getAttribute("data-pick-boss");
-          const pickedBoss = db.pokemon.find((p) => p.id === pickedId);
-          bossSearchInput.value = pickedBoss ? pickedBoss.name : "";
-          clearBossSearchBtn.classList.toggle("hidden", !bossSearchInput.value);
+          bossSearchInput.value = "";
+          clearBossSearchBtn.classList.add("hidden");
+          bossDropdown.classList.add("hidden");
           selectBossById(pickedId);
         });
       });
@@ -1134,7 +1227,7 @@
 
     populateBossSelectOptions(bossCandidates);
     renderBossQuickChips();
-    populateBossMoves();
+    selectBossById(state.selectedBossId);
   }
 
   function runOptimizerCalculation() {
