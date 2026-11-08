@@ -315,6 +315,9 @@ const POKE_DB = {
     // Volador / Hada / Normal
     tajo_aereo:        { id: "tajo_aereo",        name: "Tajo Aéreo",        type: "volador",   power: 12, durationMs: 1000, energyGain: 8 },
     tornado:           { id: "tornado",           name: "Tornado",           type: "volador",   power: 25, durationMs: 2000, energyGain: 20 },
+    paranormal:        { id: "paranormal",        name: "Paranormal",        type: "psiquico",  power: 12, durationMs: 1200, energyGain: 12 },
+    bala_semilla:      { id: "bala_semilla",      name: "Bala Semilla",      type: "planta",    power: 8,  durationMs: 1100, energyGain: 14 },
+    estoicismo:        { id: "estoicismo",        name: "Estoicismo",        type: "bicho",     power: 15, durationMs: 1500, energyGain: 15 },
     encanto:           { id: "encanto",           name: "Encanto",           type: "hada",      power: 20, durationMs: 1500, energyGain: 11 },
     viento_feeric:     { id: "viento_feeric",     name: "Viento Feérico",    type: "hada",      power: 9,  durationMs: 1000, energyGain: 13 },
     destructor:        { id: "destructor",        name: "Destructor",        type: "normal",    power: 6,  durationMs: 500,  energyGain: 5 }
@@ -367,6 +370,11 @@ const POKE_DB = {
     llama_fusion:      { id: "llama_fusion",      name: "Llama Fusión ✨",    type: "fuego",     power: 140, durationMs: 2000, energyCost: 100, isSignature: true },
     sofoco:            { id: "sofoco",            name: "Sofoco",            type: "fuego",     power: 160, durationMs: 4000, energyCost: 100 },
     puno_fuego:        { id: "puno_fuego",        name: "Puño Fuego",        type: "fuego",     power: 50,  durationMs: 2000, energyCost: 33 },
+    fuego_sagrado:     { id: "fuego_sagrado",     name: "Fuego Sagrado ✨",   type: "fuego",     power: 130, durationMs: 2200, energyCost: 100, isSignature: true },
+    llamarada:         { id: "llamarada",         name: "Llamarada",         type: "fuego",     power: 140, durationMs: 4200, energyCost: 100 },
+    onda_ignea:        { id: "onda_ignea",        name: "Onda Ígnea",        type: "fuego",     power: 95,  durationMs: 3000, energyCost: 50 },
+    doble_ferropuno:   { id: "doble_ferropuno",   name: "Doble Ferropuño ✨", type: "acero",     power: 120, durationMs: 2000, energyCost: 50,  isSignature: true },
+    megacuerno:        { id: "megacuerno",        name: "Megacuerno",        type: "bicho",     power: 110, durationMs: 2200, energyCost: 100 },
     pulso_primigenio:  { id: "pulso_primigenio",  name: "Pulso Primigenio ✨",type: "agua",      power: 130, durationMs: 1500, energyCost: 100, isSignature: true },
     hidrocanon:        { id: "hidrocanon",        name: "Hidrocañón ✨",      type: "agua",      power: 90,  durationMs: 2000, energyCost: 50,  isSignature: true },
     martillazo:        { id: "martillazo",        name: "Martillazo",        type: "agua",      power: 85,  durationMs: 2000, energyCost: 50 },
@@ -396,7 +404,14 @@ const POKE_DB = {
     vuelo:             { id: "vuelo",             name: "Vuelo",             type: "volador",   power: 85,  durationMs: 2000, energyCost: 50 },
     carantona:         { id: "carantona",         name: "Carantoña",         type: "hada",      power: 90,  durationMs: 3000, energyCost: 50 },
     fuerza_lunar:      { id: "fuerza_lunar",      name: "Fuerza Lunar",      type: "hada",      power: 130, durationMs: 4000, energyCost: 100 },
-    brillo_magico:     { id: "brillo_magico",     name: "Brillo Mágico",     type: "hada",      power: 100, durationMs: 3500, energyCost: 50 }
+    brillo_magico:     { id: "brillo_magico",     name: "Brillo Mágico",     type: "hada",      power: 100, durationMs: 3500, energyCost: 50 },
+    roca_afilada:      { id: "roca_afilada",      name: "Roca Afilada",      type: "roca",      power: 105, durationMs: 2500, energyCost: 100 },
+    poder_pasado:      { id: "poder_pasado",      name: "Poder Pasado",      type: "roca",      power: 70,  durationMs: 3500, energyCost: 33 },
+    hidrobomba:        { id: "hidrobomba",        name: "Hidrobomba",        type: "agua",      power: 135, durationMs: 3500, energyCost: 100 },
+    golpe_cuerpo:      { id: "golpe_cuerpo",      name: "Golpe Cuerpo",      type: "normal",    power: 50,  durationMs: 1900, energyCost: 33 },
+    hiperrayo:         { id: "hiperrayo",         name: "Hiperrayo",         type: "normal",    power: 150, durationMs: 3800, energyCost: 100 },
+    viga_doble:        { id: "viga_doble",        name: "Fuerza Bruta",      type: "lucha",     power: 85,  durationMs: 3000, energyCost: 50 },
+    doble_rayo:        { id: "doble_rayo",        name: "Doble Rayo",        type: "bicho",     power: 55,  durationMs: 2800, energyCost: 33 }
   },
 
   // ============================================================================
@@ -418,7 +433,9 @@ const POKE_DB = {
     gmax_puñetazo:      { id: "gmax_puñetazo",      name: "Gigapuñetazo",        type: "lucha",     class: "gigantamax", description: "Movimiento Gigamax exclusivo de Machamp Gigamax (Tipo Lucha)." },
     gmax_huracan:       { id: "gmax_huracan",       name: "Gigahuracán",         type: "volador",   class: "gigantamax", description: "Movimiento Gigamax exclusivo de Corviknight Gigamax (Tipo Volador)." },
     gmax_golpe_brusco:  { id: "gmax_golpe_brusco",  name: "Gigagolpe Brusco",    type: "siniestro", class: "gigantamax", description: "Movimiento Gigamax exclusivo de Urshifu Estilo Brusco Gigamax (Tipo Siniestro)." },
-    gmax_golpe_fluido:  { id: "gmax_golpe_fluido",  name: "Gigagolpe Fluido",    type: "agua",      class: "gigantamax", description: "Movimiento Gigamax exclusivo de Urshifu Estilo Fluido Gigamax (Tipo Agua)." }
+    gmax_golpe_fluido:  { id: "gmax_golpe_fluido",  name: "Gigagolpe Fluido",    type: "agua",      class: "gigantamax", description: "Movimiento Gigamax exclusivo de Urshifu Estilo Fluido Gigamax (Tipo Agua)." },
+    gmax_reciclaje:     { id: "gmax_reciclaje",     name: "Gigarreciclaje",      type: "normal",    class: "gigantamax", description: "Movimiento Gigamax exclusivo de Snorlax Gigamax (Tipo Normal, daño masivo)." },
+    gmax_fundido:       { id: "gmax_fundido",       name: "Gigafundido",         type: "acero",     class: "gigantamax", description: "Movimiento Gigamax exclusivo de Melmetal Gigamax (Tipo Acero)." }
   },
 
   // ============================================================================
@@ -1264,6 +1281,242 @@ const POKE_DB = {
       isBossCandidate: false,
       roleTag: "Doble Amenaza DPS Fantasma y Fuego",
       notes: "Tanto en versión normal como Oscura, su 271 de Ataque base lo hace letal en incursiones."
+    },
+
+    // --------------------------------------------------------------------------
+    // NUEVOS LEGENDARIOS DINAMAX (Johto & Kanto D-Max)
+    // --------------------------------------------------------------------------
+    {
+      id: "suicune_dmax",
+      dex: 245,
+      name: "Suicune (Dinamax / Normal)",
+      types: ["agua"],
+      baseStats: { atk: 180, def: 235, sta: 225 },
+      fastMoves: ["pistola_agua", "vaho_gelido"],
+      chargedMoves: ["hidrobomba", "surf", "rayo_gelo"],
+      canBeShadow: true,
+      maxCapable: true,
+      maxForm: "dynamax",
+      isBossCandidate: true,
+      defaultBossModes: ["dmax_t5", "raid_t5"],
+      roleTag: "Legendario Dinamax Agua & Muralla Defensiva",
+      notes: "Pistola Agua (0.5s) y 235 de Defensa base le dan una carga veloz de medidor Max en patrulla."
+    },
+    {
+      id: "lugia_dmax",
+      dex: 249,
+      name: "Lugia (Dinamax / Normal)",
+      types: ["psiquico", "volador"],
+      baseStats: { atk: 193, def: 310, sta: 235 },
+      fastMoves: ["cola_dragon", "paranormal"],
+      chargedMoves: ["ataque_aereo", "hidrobomba", "psiquico"],
+      canBeShadow: true,
+      maxCapable: true,
+      maxForm: "dynamax",
+      isBossCandidate: true,
+      defaultBossModes: ["dmax_t5", "raid_t5"],
+      roleTag: "El Tanque Dinamax más Resistente del Juego (310 DEF)",
+      notes: "Con 310 de Defensa base y Guardia Max es casi indestructible frente a jefes Max."
+    },
+    {
+      id: "ho_oh_dmax",
+      dex: 250,
+      name: "Ho-Oh (Dinamax / Normal)",
+      types: ["fuego", "volador"],
+      baseStats: { atk: 239, def: 244, sta: 214 },
+      fastMoves: ["calcinacion", "paranormal"],
+      chargedMoves: ["fuego_sagrado", "llamarada", "terremoto", "puno_fuego"],
+      canBeShadow: true,
+      maxCapable: true,
+      maxForm: "dynamax",
+      isBossCandidate: true,
+      defaultBossModes: ["dmax_t5", "raid_t5"],
+      roleTag: "Coloso Dinamax Fuego/Volador con Fuego Sagrado",
+      notes: "Gran pegada combinada con estadísticas defensivas sobresalientes (244 DEF / 214 PS)."
+    },
+
+    // --------------------------------------------------------------------------
+    // GIGAMAX CLAVE ADICIONALES (Snorlax & Melmetal)
+    // --------------------------------------------------------------------------
+    {
+      id: "snorlax_gmax",
+      dex: 143,
+      name: "Snorlax Gigamax",
+      types: ["normal"],
+      baseStats: { atk: 190, def: 169, sta: 330 },
+      fastMoves: ["lenguetazo", "cabezazo_zen"],
+      chargedMoves: ["golpe_cuerpo", "hiperrayo", "terremoto", "viga_doble"],
+      canBeShadow: false,
+      maxCapable: true,
+      maxForm: "gigantamax",
+      fixedGmaxMove: "gmax_reciclaje",
+      isBossCandidate: true,
+      defaultBossModes: ["gmax_t6"],
+      roleTag: "Tanque Gigamax Colosal & Gigarreciclaje",
+      notes: "Lengüetazo (0.5s) carga el medidor Max a toda velocidad con 330 de PS base para curar con Espíritu Max."
+    },
+    {
+      id: "melmetal_gmax",
+      dex: 809,
+      name: "Melmetal Gigamax",
+      types: ["acero"],
+      baseStats: { atk: 226, def: 190, sta: 264 },
+      fastMoves: ["impactrueno"],
+      chargedMoves: ["doble_ferropuno", "foco_resplandor", "hiperrayo", "viga_doble"],
+      canBeShadow: false,
+      maxCapable: true,
+      maxForm: "gigantamax",
+      fixedGmaxMove: "gmax_fundido",
+      isBossCandidate: true,
+      defaultBossModes: ["gmax_t6"],
+      roleTag: "Top Tanque / Atacante Gigamax Acero",
+      notes: "Impactrueno (0.5s) le otorga una de las cargas de medidor Max más veloces del juego mientras resiste con Gigafundido."
+    },
+
+    // --------------------------------------------------------------------------
+    // NUEVAS MEGAEVOLUCIONES TOP META (POKÉMON GO HUB)
+    // --------------------------------------------------------------------------
+    {
+      id: "mewtwo_mega_y",
+      dex: 150,
+      name: "Mega Mewtwo Y",
+      types: ["psiquico"],
+      baseStats: { atk: 413, def: 223, sta: 228 },
+      fastMoves: ["psicocorte", "confusion"],
+      chargedMoves: ["onda_mental", "bola_sombra", "rayo_gelo"],
+      canBeShadow: false,
+      maxCapable: false,
+      isMega: true,
+      isBossCandidate: true,
+      defaultBossModes: ["raid_mega_leg"],
+      roleTag: "Mayor Ataque Base de la Historia (413 ATQ)",
+      notes: "Mega Mewtwo Y con Psicocorte + Onda Mental redefine el daño máximo en cualquier Incursión."
+    },
+    {
+      id: "mewtwo_mega_x",
+      dex: 150,
+      name: "Mega Mewtwo X",
+      types: ["psiquico", "lucha"],
+      baseStats: { atk: 399, def: 215, sta: 228 },
+      fastMoves: ["psicocorte", "confusion"],
+      chargedMoves: ["onda_mental", "esfera_aural", "a_bocajarro"],
+      canBeShadow: false,
+      maxCapable: false,
+      isMega: true,
+      isBossCandidate: true,
+      defaultBossModes: ["raid_mega_leg"],
+      roleTag: "Híbrido Psíquico / Lucha de Máximo Poder (399 ATQ)",
+      notes: "Potencia colosal de 399 de ataque con STAB dual Psíquico y Lucha."
+    },
+    {
+      id: "diancie_mega",
+      dex: 719,
+      name: "Mega Diancie",
+      types: ["roca", "hada"],
+      baseStats: { atk: 342, def: 235, sta: 137 },
+      fastMoves: ["lanzarrocas"],
+      chargedMoves: ["avalancha", "brillo_magico", "fuerza_lunar"],
+      canBeShadow: false,
+      maxCapable: false,
+      isMega: true,
+      isBossCandidate: true,
+      defaultBossModes: ["raid_mega"],
+      roleTag: "Top #1 DPS Roca y Hada en Incursiones (342 ATQ)",
+      notes: "Con Lanzarrocas + Avalancha o Brillo Mágico destroza voladores, fuegos y dragones."
+    },
+    {
+      id: "blaziken_mega",
+      dex: 257,
+      name: "Mega Blaziken",
+      types: ["fuego", "lucha"],
+      baseStats: { atk: 329, def: 168, sta: 190 },
+      fastMoves: ["contraataque", "giro_fuego"],
+      chargedMoves: ["anillo_igneo", "onda_ignea", "a_bocajarro"],
+      canBeShadow: false,
+      maxCapable: false,
+      isMega: true,
+      isBossCandidate: true,
+      defaultBossModes: ["raid_mega"],
+      roleTag: "Top #1 DPS Mega Fuego / Lucha",
+      notes: "329 de Ataque base con Anillo Ígneo y Contraataque."
+    },
+    {
+      id: "sceptile_mega",
+      dex: 254,
+      name: "Mega Sceptile",
+      types: ["planta", "dragon"],
+      baseStats: { atk: 320, def: 186, sta: 172 },
+      fastMoves: ["bala_semilla", "dragoaliento"],
+      chargedMoves: ["planta_feroz", "garra_dragon", "terremoto"],
+      canBeShadow: false,
+      maxCapable: false,
+      isMega: true,
+      isBossCandidate: true,
+      defaultBossModes: ["raid_mega"],
+      roleTag: "Top #1 DPS Mega Planta (320 ATQ)",
+      notes: "Planta Feroz con 320 de Ataque ofrece el mayor DPS de Planta en incursiones."
+    },
+    {
+      id: "swampert_mega",
+      dex: 260,
+      name: "Mega Swampert",
+      types: ["agua", "tierra"],
+      baseStats: { atk: 283, def: 218, sta: 225 },
+      fastMoves: ["disparo_lodo", "pistola_agua"],
+      chargedMoves: ["hidrocanon", "terremoto", "surf"],
+      canBeShadow: false,
+      maxCapable: false,
+      isMega: true,
+      isBossCandidate: true,
+      defaultBossModes: ["raid_mega"],
+      roleTag: "Top Mega Agua/Tierra con Enorme Supervivencia",
+      notes: "Disparo Lodo + Hidrocañón es una ametralladora imparable de daño cargado."
+    },
+    {
+      id: "salamence_mega",
+      dex: 373,
+      name: "Mega Salamence",
+      types: ["dragon", "volador"],
+      baseStats: { atk: 310, def: 251, sta: 216 },
+      fastMoves: ["cola_dragon", "mordisco"],
+      chargedMoves: ["enfado", "cometa_draco", "hidrobomba"],
+      canBeShadow: false,
+      maxCapable: false,
+      isMega: true,
+      isBossCandidate: true,
+      defaultBossModes: ["raid_mega"],
+      roleTag: "Mega Dragón de Gran TDO y Aguante",
+      notes: "251 de Defensa y 310 de Ataque con Enfado."
+    },
+    {
+      id: "heracross_mega",
+      dex: 214,
+      name: "Mega Heracross",
+      types: ["bicho", "lucha"],
+      baseStats: { atk: 334, def: 223, sta: 190 },
+      fastMoves: ["contraataque", "estoicismo"],
+      chargedMoves: ["a_bocajarro", "megacuerno", "terremoto"],
+      canBeShadow: false,
+      maxCapable: false,
+      isMega: true,
+      isBossCandidate: true,
+      defaultBossModes: ["raid_mega"],
+      roleTag: "Top #1 Atacante Mega Bicho y Top Lucha (334 ATQ)",
+      notes: "334 de Ataque base con Contraataque y A Bocajarro."
+    },
+    {
+      id: "baxcalibur",
+      dex: 998,
+      name: "Baxcalibur",
+      types: ["dragon", "hielo"],
+      baseStats: { atk: 254, def: 168, sta: 229 },
+      fastMoves: ["dragoaliento", "colmillo_hielo"],
+      chargedMoves: ["alud", "garra_dragon", "ventisca"],
+      canBeShadow: true,
+      maxCapable: false,
+      isBossCandidate: false,
+      roleTag: "Pseudo-legendario Hielo / Dragón de Paldea",
+      notes: "Colmillo Hielo + Alud lo sitúan como un counter excepcional contra Eternatus y Rayquaza."
     }
   ],
 
