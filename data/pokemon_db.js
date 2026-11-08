@@ -1,0 +1,1268 @@
+/**
+ * PokéRaid & Max Optimizer - Base de Datos Maestra (Pokémon GO)
+ * Incluye:
+ *  - Constantes mecánicas oficiales de Pokémon GO (CPM, Tipos, Tiers de Incursión y Combates Max, Modificadores)
+ *  - Base de datos de Movimientos Rápidos, Cargados y Movimientos Max (Dinamax / Gigamax / Característicos)
+ *  - Base de datos de Pokémon (Eternatus, Duraludon Gigamax, Iniciales Galar/Kanto Gigamax, Legendarios, Megas y Meta)
+ */
+
+const POKE_DB = {
+  version: "2.5.0-2026",
+  lastUpdated: "2026-11",
+
+  // ============================================================================
+  // 1. TABLA DE TIPOS Y MULTIPLICADORES OFICIALES DE POKÉMON GO
+  // Super eficaz = 1.6x | Neutro = 1.0x | No muy eficaz = 0.625x | Inmune = 0.390625x
+  // ============================================================================
+  types: [
+    "normal", "fuego", "agua", "planta", "electrico", "hielo",
+    "lucha", "veneno", "tierra", "volador", "psiquico", "bicho",
+    "roca", "fantasma", "dragon", "siniestro", "acero", "hada"
+  ],
+
+  typeMeta: {
+    normal:    { name: "Normal",    color: "#9ca3af", bg: "bg-gray-500/20",    border: "border-gray-400",    text: "text-gray-300",    maxMoveName: "Maxiataque" },
+    fuego:     { name: "Fuego",     color: "#f97316", bg: "bg-orange-500/20",  border: "border-orange-500",  text: "text-orange-400",  maxMoveName: "Maxiignición" },
+    agua:      { name: "Agua",      color: "#3b82f6", bg: "bg-blue-500/20",    border: "border-blue-500",    text: "text-blue-400",    maxMoveName: "Maxichorro" },
+    planta:    { name: "Planta",    color: "#22c55e", bg: "bg-green-500/20",   border: "border-green-500",   text: "text-green-400",   maxMoveName: "Maxiflora" },
+    electrico: { name: "Eléctrico", color: "#eab308", bg: "bg-yellow-500/20",  border: "border-yellow-400",  text: "text-yellow-300",  maxMoveName: "Maxitormenta" },
+    hielo:     { name: "Hielo",     color: "#06b6d4", bg: "bg-cyan-500/20",    border: "border-cyan-400",    text: "text-cyan-300",    maxMoveName: "Maxihelada" },
+    lucha:     { name: "Lucha",     color: "#ef4444", bg: "bg-red-600/20",     border: "border-red-500",     text: "text-red-400",     maxMoveName: "Maxipuño" },
+    veneno:    { name: "Veneno",    color: "#a855f7", bg: "bg-purple-500/20",  border: "border-purple-500",  text: "text-purple-400",  maxMoveName: "Maxiácido" },
+    tierra:    { name: "Tierra",    color: "#d97706", bg: "bg-amber-600/20",   border: "border-amber-500",   text: "text-amber-400",   maxMoveName: "Maxitemblor" },
+    volador:   { name: "Volador",   color: "#818cf8", bg: "bg-indigo-400/20",  border: "border-indigo-400",  text: "text-indigo-300",  maxMoveName: "Maxiciclón" },
+    psiquico:  { name: "Psíquico",  color: "#ec4899", bg: "bg-pink-500/20",    border: "border-pink-500",    text: "text-pink-400",    maxMoveName: "Maxionda" },
+    bicho:     { name: "Bicho",     color: "#84cc16", bg: "bg-lime-500/20",    border: "border-lime-500",    text: "text-lime-400",    maxMoveName: "Maxiinsécto" },
+    roca:      { name: "Roca",      color: "#a16207", bg: "bg-yellow-700/20",  border: "border-yellow-600",  text: "text-yellow-500",  maxMoveName: "Maxilito" },
+    fantasma:  { name: "Fantasma",  color: "#7c3aed", bg: "bg-violet-600/20",  border: "border-violet-500",  text: "text-violet-400",  maxMoveName: "Maxiespectro" },
+    dragon:    { name: "Dragón",    color: "#6366f1", bg: "bg-indigo-600/20",  border: "border-indigo-500",  text: "text-indigo-400",  maxMoveName: "Maxidraco" },
+    siniestro: { name: "Siniestro", color: "#52525b", bg: "bg-zinc-700/40",    border: "border-zinc-500",    text: "text-zinc-300",    maxMoveName: "Maxisombra" },
+    acero:     { name: "Acero",     color: "#64748b", bg: "bg-slate-500/20",   border: "border-slate-400",   text: "text-slate-300",   maxMoveName: "Maxisecuela" },
+    hada:      { name: "Hada",      color: "#f472b6", bg: "bg-rose-400/20",    border: "border-rose-400",    text: "text-rose-300",    maxMoveName: "Maxiestela" }
+  },
+
+  // Matriz de eficacia: typeChart[tipoAtacante][tipoDefensor]
+  // Si no está definido en el sub-objeto, el multiplicador es 1.0
+  typeChart: {
+    normal:    { roca: 0.625, fantasma: 0.390625, acero: 0.625 },
+    fuego:     { fuego: 0.625, agua: 0.625, planta: 1.6, hielo: 1.6, bicho: 1.6, roca: 0.625, dragon: 0.625, acero: 1.6 },
+    agua:      { fuego: 1.6, agua: 0.625, planta: 0.625, tierra: 1.6, roca: 1.6, dragon: 0.625 },
+    planta:    { fuego: 0.625, agua: 1.6, planta: 0.625, veneno: 0.625, tierra: 1.6, volador: 0.625, bicho: 0.625, roca: 1.6, dragon: 0.625, acero: 0.625 },
+    electrico: { agua: 1.6, planta: 0.625, electrico: 0.625, tierra: 0.390625, volador: 1.6, dragon: 0.625 },
+    hielo:     { fuego: 0.625, agua: 0.625, planta: 1.6, hielo: 0.625, tierra: 1.6, volador: 1.6, dragon: 1.6, acero: 0.625 },
+    lucha:     { normal: 1.6, hielo: 1.6, veneno: 0.625, volador: 0.625, psiquico: 0.625, bicho: 0.625, roca: 1.6, fantasma: 0.390625, siniestro: 1.6, acero: 1.6, hada: 0.625 },
+    veneno:    { planta: 1.6, veneno: 0.625, tierra: 0.625, roca: 0.625, fantasma: 0.625, acero: 0.390625, hada: 1.6 },
+    tierra:    { fuego: 1.6, planta: 0.625, electrico: 1.6, veneno: 1.6, volador: 0.390625, bicho: 0.625, roca: 1.6, acero: 1.6 },
+    volador:   { planta: 1.6, electrico: 0.625, lucha: 1.6, bicho: 1.6, roca: 0.625, acero: 0.625 },
+    psiquico:  { lucha: 1.6, veneno: 1.6, psiquico: 0.625, siniestro: 0.390625, acero: 0.625 },
+    bicho:     { fuego: 0.625, planta: 1.6, lucha: 0.625, veneno: 0.625, volador: 0.625, psiquico: 1.6, fantasma: 0.625, siniestro: 1.6, acero: 0.625, hada: 0.625 },
+    roca:      { fuego: 1.6, hielo: 1.6, lucha: 0.625, tierra: 0.625, volador: 1.6, bicho: 1.6, acero: 0.625 },
+    fantasma:  { normal: 0.390625, psiquico: 1.6, fantasma: 1.6, siniestro: 0.625 },
+    dragon:    { dragon: 1.6, acero: 0.625, hada: 0.390625 },
+    siniestro: { lucha: 0.625, psiquico: 1.6, fantasma: 1.6, siniestro: 0.625, hada: 0.625 },
+    acero:     { fuego: 0.625, agua: 0.625, electrico: 0.625, hielo: 1.6, roca: 1.6, acero: 0.625, hada: 1.6 },
+    hada:      { fuego: 0.625, lucha: 1.6, veneno: 0.625, dragon: 1.6, siniestro: 1.6, acero: 0.625 }
+  },
+
+  // ============================================================================
+  // 2. MULTIPLICADORES DE NIVEL (CPM - Combat Power Multiplier) Y PRESETS
+  // ============================================================================
+  cpmTable: {
+    15: 0.51739395,
+    20: 0.59740001,
+    25: 0.66793400,
+    30: 0.73170000,
+    32.5: 0.74678121,
+    35: 0.76156384,
+    37.5: 0.77606496,
+    40: 0.79030001,
+    42.5: 0.80279999,
+    45: 0.81529999,
+    47.5: 0.82779999,
+    50: 0.84029999,
+    51: 0.84529999 // Mejor Compañero
+  },
+
+  levelPresets: [
+    { id: "caught",   label: "Recién atrapado (Nv. 20-25)", level: 22.5, cpm: 0.6336445, badge: "Nv. 22.5" },
+    { id: "weather",  label: "Atrapado con Clima / Subido básico (Nv. 30)", level: 30, cpm: 0.73170000, badge: "Nv. 30" },
+    { id: "no_xl",    label: "Subido sin XL (Nv. 35-40)",   level: 40,   cpm: 0.79030001, badge: "Nv. 40" },
+    { id: "mid_xl",   label: "Subido con XL parcial (Nv. 45)", level: 45, cpm: 0.81529999, badge: "Nv. 45" },
+    { id: "maxed",    label: "Maxeado al límite (Nv. 50)",  level: 50,   cpm: 0.84029999, badge: "Nv. 50" },
+    { id: "bestbuddy",label: "Maxeado + Mejor Compañero (Nv. 51)", level: 51, cpm: 0.84529999, badge: "Nv. 51" }
+  ],
+
+  // ============================================================================
+  // 3. BONIFICACIONES Y CONDICIONES DE COMBATE
+  // ============================================================================
+  combatModifiers: {
+    stab: 1.2,
+    shadowAttackBonus: 1.2,
+    shadowDefenseMultiplier: 0.8333333,
+    weatherBoost: 1.2,
+    friendship: {
+      none:  { label: "Sin Amistad (0%)",     multiplier: 1.00 },
+      good:  { label: "Buen Amigo (+3%)",     multiplier: 1.03 },
+      great: { label: "Gran Amigo (+5%)",     multiplier: 1.05 },
+      ultra: { label: "Ultra Amigo (+7%)",    multiplier: 1.07 },
+      best:  { label: "Mejor Amigo (+10%)",   multiplier: 1.10 }
+    },
+    megaBonus: {
+      none:  { label: "Sin Mega activa (0%)",              multiplier: 1.00 },
+      diff:  { label: "Mega activa otro tipo (+10%)",      multiplier: 1.10 },
+      same:  { label: "Mega/Primigenio mismo tipo (+30%)", multiplier: 1.30 }
+    },
+    // Poder de Equipo (Party Power): duplica el daño de ataques cargados cada N ataques rápidos
+    partyPower: {
+      1: { label: "Solo (Sin Party Power)", chargeFrequencyFastHits: Infinity, effectiveChargedBoost: 1.00 },
+      2: { label: "Party de 2 jugadores",   chargeFrequencyFastHits: 18,       effectiveChargedBoost: 1.28 },
+      3: { label: "Party de 3 jugadores",   chargeFrequencyFastHits: 9,        effectiveChargedBoost: 1.50 },
+      4: { label: "Party de 4 jugadores",   chargeFrequencyFastHits: 6,        effectiveChargedBoost: 1.68 }
+    },
+    // Multiplicadores de Ataque Max según nivel de mejora (1, 2 o 3) y si es Dinamax o Gigamax
+    maxMovePotency: {
+      dynamax:   { 1: 250, 2: 300, 3: 350 },
+      gigantamax:{ 1: 350, 2: 400, 3: 450 },
+      eternamax: { 1: 370, 2: 420, 3: 470 } // Cañón Dinamax bonificado contra jefes Max
+    },
+    maxSpiritHealPerLevel: { 0: 0, 1: 0.08, 2: 0.12, 3: 0.16 },
+    maxGuardShieldPerLevel: { 0: 0, 1: 20, 2: 40, 3: 60 }
+  },
+
+  // ============================================================================
+  // 4. TIERS DE INCURSIONES Y COMBATES MAX (HP, CPM, TIEMPO, LÍMITES)
+  // ============================================================================
+  battleModes: {
+    raid_t5: {
+      id: "raid_t5",
+      category: "raid",
+      name: "Incursión Nivel 5 (Legendaria)",
+      shortName: "Raid Nv. 5",
+      bossHP: 15000,
+      bossCPM: 0.7903,
+      timeLimitSec: 300,
+      teamSize: 6,
+      maxLobbyPlayers: 20,
+      allowPartyPower: true,
+      description: "Jefe Legendario estándar con 15.000 PS y 300 segundos en el reloj."
+    },
+    raid_mega: {
+      id: "raid_mega",
+      category: "raid",
+      name: "Mega Incursión (Nv. 4+)",
+      shortName: "Mega Raid",
+      bossHP: 9000,
+      bossCPM: 0.7903,
+      timeLimitSec: 300,
+      teamSize: 6,
+      maxLobbyPlayers: 20,
+      allowPartyPower: true,
+      description: "Jefe Megaevolucionado estándar con 9.000 PS y 300 segundos."
+    },
+    raid_mega_leg: {
+      id: "raid_mega_leg",
+      category: "raid",
+      name: "Incursión Primigenia / Mega Legendaria (Nv. 6)",
+      shortName: "Primigenia / Mega Leg.",
+      bossHP: 22500,
+      bossCPM: 0.7903,
+      timeLimitSec: 300,
+      teamSize: 6,
+      maxLobbyPlayers: 20,
+      allowPartyPower: true,
+      description: "Groudon/Kyogre Primigenio o Mega Rayquaza/Latios/Latias con 22.500 PS."
+    },
+    raid_shadow_t5: {
+      id: "raid_shadow_t5",
+      category: "raid",
+      name: "Incursión Oscura Nivel 5 (Enfurecido)",
+      shortName: "Raid Oscura Nv. 5",
+      bossHP: 15000,
+      bossCPM: 0.815,
+      timeLimitSec: 300,
+      teamSize: 6,
+      maxLobbyPlayers: 20,
+      allowPartyPower: true,
+      enrageDefenseBoost: 1.25,
+      description: "Jefe Oscuro Legendario. Se enfurece aumentando su Ataque y Defensa si no se usan Gemas Purificadas."
+    },
+    raid_elite: {
+      id: "raid_elite",
+      category: "raid",
+      name: "Incursión Élite (Presencial)",
+      shortName: "Incursión Élite",
+      bossHP: 20000,
+      bossCPM: 0.8403,
+      timeLimitSec: 300,
+      teamSize: 6,
+      maxLobbyPlayers: 20,
+      allowPartyPower: true,
+      description: "Incursión de máxima dificultad presencial con 20.000 PS y estadísticas escaladas a Nv. 50."
+    },
+    dmax_t1: {
+      id: "dmax_t1",
+      category: "max",
+      name: "Combate Dinamax Nivel 1",
+      shortName: "Dinamax Nv. 1",
+      bossHP: 1700,
+      bossCPM: 0.50,
+      timeLimitSec: 240,
+      teamSize: 3,
+      maxLobbyPlayers: 4,
+      squadSize: 4,
+      allowPartyPower: false,
+      description: "Combate Dinamax inicial para 1-4 entrenadores (3 Pokémon Max por jugador)."
+    },
+    dmax_t3: {
+      id: "dmax_t3",
+      category: "max",
+      name: "Combate Dinamax Nivel 3",
+      shortName: "Dinamax Nv. 3",
+      bossHP: 10000,
+      bossCPM: 0.70,
+      timeLimitSec: 240,
+      teamSize: 3,
+      maxLobbyPlayers: 4,
+      squadSize: 4,
+      allowPartyPower: false,
+      description: "Combate Dinamax intermedio (Beldum, Falinks, Cryogonal) para patrulla de hasta 4 jugadores."
+    },
+    dmax_t5: {
+      id: "dmax_t5",
+      category: "max",
+      name: "Combate Dinamax Nivel 5 (Legendario)",
+      shortName: "Dinamax Nv. 5",
+      bossHP: 27000,
+      bossCPM: 0.7903,
+      timeLimitSec: 300,
+      teamSize: 3,
+      maxLobbyPlayers: 4,
+      squadSize: 4,
+      allowPartyPower: false,
+      description: "Jefe Legendario Dinamax (Aves Legendarias, Bestias, Eternatus) limitado a 1 patrulla de 4 entrenadores."
+    },
+    gmax_t6: {
+      id: "gmax_t6",
+      category: "max",
+      name: "Combate Gigamax Nivel 6 (Patrullas de 4 / Hasta 40 Jugadores)",
+      shortName: "Gigamax Nv. 6",
+      bossHP: 95000,
+      bossCPM: 0.85,
+      timeLimitSec: 320,
+      teamSize: 3,
+      maxLobbyPlayers: 40,
+      squadSize: 4,
+      allowPartyPower: false,
+      description: "Jefe Gigamax colosal (~95.000 PS). Los jugadores se dividen en patrullas de 4 que cargan su propio medidor Max antes de que el jefe entre en estado Desesperado."
+    }
+  },
+
+  // ============================================================================
+  // 5. MOVIMIENTOS RÁPIDOS (PvE / Incursiones / Generación de Medidor Max)
+  // ============================================================================
+  fastMoves: {
+    // Dragón
+    cola_dragon:       { id: "cola_dragon",       name: "Cola Dragón",       type: "dragon",    power: 14, durationMs: 1000, energyGain: 9 },
+    dragoaliento:      { id: "dragoaliento",      name: "Dragoaliento",      type: "dragon",    power: 6,  durationMs: 500,  energyGain: 4 },
+    // Acero
+    garra_metal:       { id: "garra_metal",       name: "Garra Metal",       type: "acero",     power: 8,  durationMs: 500,  energyGain: 7 },
+    puno_bala:         { id: "puno_bala",         name: "Puño Bala",         type: "acero",     power: 10, durationMs: 1000, energyGain: 11 },
+    cola_ferrea:       { id: "cola_ferrea",       name: "Cola Férrea",       type: "acero",     power: 14, durationMs: 1000, energyGain: 7 },
+    // Veneno
+    puya_nociva:       { id: "puya_nociva",       name: "Puya Nociva",       type: "veneno",    power: 13, durationMs: 1000, energyGain: 9 },
+    acido:             { id: "acido",             name: "Ácido",             type: "veneno",    power: 11, durationMs: 1000, energyGain: 10 },
+    // Tierra
+    disparo_lodo:      { id: "disparo_lodo",      name: "Disparo Lodo",      type: "tierra",    power: 4,  durationMs: 500,  energyGain: 7 },
+    bofeton_lodo:      { id: "bofeton_lodo",      name: "Bofetón Lodo",      type: "tierra",    power: 19, durationMs: 1500, energyGain: 13 },
+    // Roca
+    lanzarrocas:       { id: "lanzarrocas",       name: "Lanzarrocas",       type: "roca",      power: 13, durationMs: 1000, energyGain: 8 },
+    antiderribo:       { id: "antiderribo",       name: "Antiaéreo",         type: "roca",      power: 13, durationMs: 1000, energyGain: 8 },
+    // Hielo
+    nieve_polvo:       { id: "nieve_polvo",       name: "Nieve Polvo",       type: "hielo",     power: 6,  durationMs: 1000, energyGain: 15 },
+    colmillo_hielo:    { id: "colmillo_hielo",    name: "Colmillo Hielo",    type: "hielo",     power: 12, durationMs: 1500, energyGain: 20 },
+    vaho_gelido:       { id: "vaho_gelido",       name: "Vaho Gélido",       type: "hielo",     power: 11, durationMs: 1000, energyGain: 9 },
+    // Fuego
+    giro_fuego:        { id: "giro_fuego",        name: "Giro Fuego",        type: "fuego",     power: 13, durationMs: 1000, energyGain: 9 },
+    colmillo_igneo:    { id: "colmillo_igneo",    name: "Colmillo Ígneo",    type: "fuego",     power: 13, durationMs: 1000, energyGain: 9 },
+    ascuas:            { id: "ascuas",            name: "Ascuas",            type: "fuego",     power: 10, durationMs: 1000, energyGain: 10 },
+    calcinacion:       { id: "calcinacion",       name: "Calcinación",       type: "fuego",     power: 32, durationMs: 2500, energyGain: 22 },
+    // Agua
+    cascada:           { id: "cascada",           name: "Cascada",           type: "agua",      power: 13, durationMs: 1000, energyGain: 7 },
+    pistola_agua:      { id: "pistola_agua",      name: "Pistola Agua",      type: "agua",      power: 5,  durationMs: 500,  energyGain: 5 },
+    // Planta
+    latigo_cepa:       { id: "latigo_cepa",       name: "Látigo Cepa",       type: "planta",    power: 6,  durationMs: 500,  energyGain: 5 },
+    hoja_afilada:      { id: "hoja_afilada",      name: "Hoja Afilada",      type: "planta",    power: 13, durationMs: 1000, energyGain: 7 },
+    // Eléctrico
+    impactrueno:       { id: "impactrueno",       name: "Impactrueno",       type: "electrico", power: 4,  durationMs: 500,  energyGain: 7 },
+    chispa:            { id: "chispa",            name: "Chispa",            type: "electrico", power: 4,  durationMs: 500,  energyGain: 6 },
+    voltiocambio:      { id: "voltiocambio",      name: "Voltiocambio",      type: "electrico", power: 13, durationMs: 1500, energyGain: 20 },
+    colmillo_rayo:     { id: "colmillo_rayo",     name: "Colmillo Rayo",     type: "electrico", power: 10, durationMs: 1000, energyGain: 11 },
+    // Psíquico
+    psicocorte:        { id: "psicocorte",        name: "Psicocorte",        type: "psiquico",  power: 4,  durationMs: 500,  energyGain: 7 },
+    confusion:         { id: "confusion",         name: "Confusión",         type: "psiquico",  power: 19, durationMs: 1500, energyGain: 14 },
+    cabezazo_zen:      { id: "cabezazo_zen",      name: "Cabezazo Zen",      type: "psiquico",  power: 11, durationMs: 1000, energyGain: 9 },
+    // Lucha
+    contraataque:      { id: "contraataque",      name: "Contraataque",      type: "lucha",     power: 13, durationMs: 1000, energyGain: 9 },
+    doble_patada:      { id: "doble_patada",      name: "Doble Patada",      type: "lucha",     power: 10, durationMs: 1000, energyGain: 13 },
+    palmeo:            { id: "palmeo",            name: "Palmeo",            type: "lucha",     power: 10, durationMs: 1000, energyGain: 13 },
+    // Fantasma / Siniestro
+    garra_umbria:      { id: "garra_umbria",      name: "Garra Umbría",      type: "fantasma",  power: 6,  durationMs: 500,  energyGain: 4 },
+    lenguetazo:        { id: "lenguetazo",        name: "Lengüetazo",        type: "fantasma",  power: 5,  durationMs: 500,  energyGain: 6 },
+    mordisco:          { id: "mordisco",          name: "Mordisco",          type: "siniestro", power: 6,  durationMs: 500,  energyGain: 4 },
+    alarido:           { id: "alarido",           name: "Alarido",           type: "siniestro", power: 11, durationMs: 1000, energyGain: 13 },
+    // Volador / Hada / Normal
+    tajo_aereo:        { id: "tajo_aereo",        name: "Tajo Aéreo",        type: "volador",   power: 12, durationMs: 1000, energyGain: 8 },
+    tornado:           { id: "tornado",           name: "Tornado",           type: "volador",   power: 25, durationMs: 2000, energyGain: 20 },
+    encanto:           { id: "encanto",           name: "Encanto",           type: "hada",      power: 20, durationMs: 1500, energyGain: 11 },
+    viento_feeric:     { id: "viento_feeric",     name: "Viento Feérico",    type: "hada",      power: 9,  durationMs: 1000, energyGain: 13 },
+    destructor:        { id: "destructor",        name: "Destructor",        type: "normal",    power: 6,  durationMs: 500,  energyGain: 5 }
+  },
+
+  // ============================================================================
+  // 6. MOVIMIENTOS CARGADOS (PvE / Incursiones)
+  // ============================================================================
+  chargedMoves: {
+    // Característicos Eternatus & Dragones
+    canon_dinamax:     { id: "canon_dinamax",     name: "Cañón Dinamax ✨",   type: "dragon",    power: 215, durationMs: 1500, energyCost: 100, isSignature: true },
+    rayo_infinito:     { id: "rayo_infinito",     name: "Rayo Infinito ✨",   type: "dragon",    power: 260, durationMs: 3200, energyCost: 100, isSignature: true },
+    bomba_lodo:        { id: "bomba_lodo",        name: "Bomba Lodo",        type: "veneno",    power: 85,  durationMs: 2500, energyCost: 50 },
+    onda_toxica:       { id: "onda_toxica",       name: "Onda Tóxica",       type: "veneno",    power: 105, durationMs: 3000, energyCost: 100 },
+    lanzallamas:       { id: "lanzallamas",       name: "Lanzallamas",       type: "fuego",     power: 65,  durationMs: 2000, energyCost: 50 },
+    enfado:            { id: "enfado",            name: "Enfado",            type: "dragon",    power: 110, durationMs: 4000, energyCost: 50 },
+    cometa_draco:      { id: "cometa_draco",      name: "Cometa Draco",      type: "dragon",    power: 150, durationMs: 3500, energyCost: 100 },
+    garra_dragon:      { id: "garra_dragon",      name: "Garra Dragón",      type: "dragon",    power: 45,  durationMs: 1500, energyCost: 33 },
+    vasto_impacto:     { id: "vasto_impacto",     name: "Vasto Impacto",     type: "dragon",    power: 65,  durationMs: 1000, energyCost: 33 },
+    distorsion:        { id: "distorsion",        name: "Distorsión ✨",      type: "dragon",    power: 160, durationMs: 2000, energyCost: 100, isSignature: true },
+    fragor_escamas:    { id: "fragor_escamas",    name: "Fragor Escamas",    type: "dragon",    power: 120, durationMs: 2500, energyCost: 100 },
+
+    // Acero
+    foco_resplandor:   { id: "foco_resplandor",   name: "Foco Resplandor",   type: "acero",     power: 100, durationMs: 2500, energyCost: 100 },
+    puno_meteoro:      { id: "puno_meteoro",      name: "Puño Meteoro ✨",    type: "acero",     power: 100, durationMs: 2500, energyCost: 50,  isSignature: true },
+    meteoimpacto:      { id: "meteoimpacto",      name: "Meteoimpacto ✨",    type: "acero",     power: 230, durationMs: 3000, energyCost: 100, isSignature: true },
+    tajo_supremo:      { id: "tajo_supremo",      name: "Tajo Supremo ✨",    type: "acero",     power: 200, durationMs: 2000, energyCost: 100, isSignature: true },
+    embate_supremo:    { id: "embate_supremo",    name: "Embate Supremo ✨",  type: "acero",     power: 185, durationMs: 2000, energyCost: 100, isSignature: true },
+    cabeza_hierro:     { id: "cabeza_hierro",     name: "Cabeza de Hierro",  type: "acero",     power: 60,  durationMs: 2000, energyCost: 50 },
+
+    // Tierra / Roca
+    filo_del_abismo:   { id: "filo_del_abismo",   name: "Filo del Abismo ✨", type: "tierra",    power: 130, durationMs: 1500, energyCost: 100, isSignature: true },
+    terremoto:         { id: "terremoto",         name: "Terremoto",         type: "tierra",    power: 140, durationMs: 3500, energyCost: 100 },
+    tierra_viva:       { id: "tierra_viva",       name: "Tierra Viva",       type: "tierra",    power: 100, durationMs: 3500, energyCost: 50 },
+    arena_ardiente:    { id: "arena_ardiente",    name: "Arena Ardiente",    type: "tierra",    power: 90,  durationMs: 3000, energyCost: 50 },
+    taladradora:       { id: "taladradora",       name: "Taladradora",       type: "tierra",    power: 85,  durationMs: 3000, energyCost: 50 },
+    romperrocas:       { id: "romperrocas",       name: "Romperrocas ✨",     type: "roca",      power: 110, durationMs: 3500, energyCost: 50,  isSignature: true },
+    avalancha:         { id: "avalancha",         name: "Avalancha",         type: "roca",      power: 75,  durationMs: 2500, energyCost: 50 },
+    roca_afilada:      { id: "roca_afilada",      name: "Roca Afilada",      type: "roca",      power: 105, durationMs: 2500, energyCost: 100 },
+
+    // Hielo
+    alud:              { id: "alud",              name: "Alud",              type: "hielo",     power: 85,  durationMs: 2500, energyCost: 50 },
+    mundo_gelido:      { id: "mundo_gelido",      name: "Mundo Gélido ✨",    type: "hielo",     power: 160, durationMs: 2500, energyCost: 100, isSignature: true },
+    rayo_gelo:         { id: "rayo_gelo",         name: "Rayo Gélido ✨",     type: "hielo",     power: 160, durationMs: 2000, energyCost: 100, isSignature: true },
+    llama_gelo:        { id: "llama_gelo",        name: "Llama Gélida ✨",    type: "hielo",     power: 160, durationMs: 2000, energyCost: 100, isSignature: true },
+    ventisca:          { id: "ventisca",          name: "Ventisca",          type: "hielo",     power: 130, durationMs: 3000, energyCost: 100 },
+
+    // Fuego / Agua / Planta / Eléctrico
+    anillo_igneo:      { id: "anillo_igneo",      name: "Anillo Ígneo ✨",    type: "fuego",     power: 110, durationMs: 3500, energyCost: 50,  isSignature: true },
+    llama_fusion:      { id: "llama_fusion",      name: "Llama Fusión ✨",    type: "fuego",     power: 140, durationMs: 2000, energyCost: 100, isSignature: true },
+    sofoco:            { id: "sofoco",            name: "Sofoco",            type: "fuego",     power: 160, durationMs: 4000, energyCost: 100 },
+    puno_fuego:        { id: "puno_fuego",        name: "Puño Fuego",        type: "fuego",     power: 50,  durationMs: 2000, energyCost: 33 },
+    pulso_primigenio:  { id: "pulso_primigenio",  name: "Pulso Primigenio ✨",type: "agua",      power: 130, durationMs: 1500, energyCost: 100, isSignature: true },
+    hidrocanon:        { id: "hidrocanon",        name: "Hidrocañón ✨",      type: "agua",      power: 90,  durationMs: 2000, energyCost: 50,  isSignature: true },
+    hidrobomba:        { id: "hidrobomba",        name: "Hidrobomba",        type: "agua",      power: 135, durationMs: 3500, energyCost: 100 },
+    surf:              { id: "surf",              name: "Surf",              type: "agua",      power: 60,  durationMs: 1500, energyCost: 50 },
+    planta_feroz:      { id: "planta_feroz",      name: "Planta Feroz ✨",    type: "planta",    power: 100, durationMs: 2500, energyCost: 50,  isSignature: true },
+    hoja_aguda:        { id: "hoja_aguda",        name: "Hoja Aguda",        type: "planta",    power: 70,  durationMs: 2500, energyCost: 33 },
+    hierba_lazo:       { id: "hierba_lazo",       name: "Hierba Lazo",       type: "planta",    power: 90,  durationMs: 2500, energyCost: 50 },
+    rayo_fusion:       { id: "rayo_fusion",       name: "Rayo Fusión ✨",     type: "electrico", power: 140, durationMs: 2000, energyCost: 100, isSignature: true },
+    voltio_cruel:      { id: "voltio_cruel",      name: "Voltio Cruel",      type: "electrico", power: 90,  durationMs: 2500, energyCost: 50 },
+    chispazo:          { id: "chispazo",          name: "Chispazo",          type: "electrico", power: 65,  durationMs: 2500, energyCost: 33 },
+    rayo:              { id: "rayo",              name: "Rayo",              type: "electrico", power: 80,  durationMs: 2500, energyCost: 50 },
+
+    // Psíquico / Lucha / Fantasma / Siniestro / Volador / Hada
+    onda_mental:       { id: "onda_mental",       name: "Onda Mental ✨",     type: "psiquico",  power: 90,  durationMs: 2500, energyCost: 50,  isSignature: true },
+    psiquico:          { id: "psiquico",          name: "Psíquico",          type: "psiquico",  power: 95,  durationMs: 3000, energyCost: 50 },
+    esfera_aural:      { id: "esfera_aural",      name: "Esfera Aural ✨",    type: "lucha",     power: 100, durationMs: 2000, energyCost: 50,  isSignature: true },
+    espada_santa:      { id: "espada_santa",      name: "Espada Santa ✨",    type: "lucha",     power: 50,  durationMs: 1000, energyCost: 33,  isSignature: true },
+    puno_dinamico:     { id: "puno_dinamico",     name: "Puño Dinámico",     type: "lucha",     power: 85,  durationMs: 2500, energyCost: 50 },
+    a_bocajarro:       { id: "a_bocajarro",       name: "A Bocajarro",       type: "lucha",     power: 105, durationMs: 2500, energyCost: 100 },
+    rayo_umbrio:       { id: "rayo_umbrio",       name: "Rayo Umbrío ✨",     type: "fantasma",  power: 230, durationMs: 3000, energyCost: 100, isSignature: true },
+    bola_sombra:       { id: "bola_sombra",       name: "Bola Sombra",       type: "fantasma",  power: 100, durationMs: 3000, energyCost: 50 },
+    pulso_umbrio:      { id: "pulso_umbrio",      name: "Pulso Umbrío",      type: "siniestro", power: 80,  durationMs: 3000, energyCost: 50 },
+    giro_vil:          { id: "giro_vil",          name: "Giro Vil",          type: "siniestro", power: 65,  durationMs: 1000, energyCost: 33 },
+    ascenso_draco:     { id: "ascenso_draco",     name: "Ascenso Draco ✨",   type: "volador",   power: 140, durationMs: 2000, energyCost: 50,  isSignature: true },
+    ataque_aereo:      { id: "ataque_aereo",      name: "Ataque Aéreo ✨",    type: "volador",   power: 80,  durationMs: 2000, energyCost: 50,  isSignature: true },
+    carantona:         { id: "carantona",         name: "Carantoña",         type: "hada",      power: 90,  durationMs: 3000, energyCost: 50 },
+    fuerza_lunar:      { id: "fuerza_lunar",      name: "Fuerza Lunar",      type: "hada",      power: 130, durationMs: 4000, energyCost: 100 },
+    brillo_magico:     { id: "brillo_magico",     name: "Brillo Mágico",     type: "hada",      power: 100, durationMs: 3500, energyCost: 50 }
+  },
+
+  // ============================================================================
+  // 7. MOVIMIENTOS GIGAMAX Y CARACTERÍSTICOS MAX (G-Max Moves)
+  // ============================================================================
+  gmaxMoves: {
+    gmax_canon_dinamax: { id: "gmax_canon_dinamax", name: "Cañón Dinamax (Max)", type: "dragon",    class: "eternamax", description: "Movimiento exclusivo de Eternatus. Inflige daño masivo extra contra jefes Dinamax y Gigamax." },
+    gmax_esquirla:      { id: "gmax_esquirla",      name: "Gigaesquirla",        type: "dragon",    class: "gigantamax", description: "Movimiento Gigamax exclusivo de Duraludon Gigamax (Tipo Dragón, potencia 350/400/450)." },
+    gmax_redoble:       { id: "gmax_redoble",       name: "Gigarredoble",        type: "planta",    class: "gigantamax", description: "Movimiento Gigamax exclusivo de Rillaboom Gigamax (Tipo Planta)." },
+    gmax_esfera_ignea:  { id: "gmax_esfera_ignea",  name: "Gigaesfera Ígnea",    type: "fuego",     class: "gigantamax", description: "Movimiento Gigamax exclusivo de Cinderace Gigamax (Tipo Fuego)." },
+    gmax_disparo:       { id: "gmax_disparo",       name: "Gigadisparo",         type: "agua",      class: "gigantamax", description: "Movimiento Gigamax exclusivo de Inteleon Gigamax (Tipo Agua)." },
+    gmax_llamarada:     { id: "gmax_llamarada",     name: "Gigallamarada",       type: "fuego",     class: "gigantamax", description: "Movimiento Gigamax exclusivo de Charizard Gigamax (Tipo Fuego)." },
+    gmax_canonazo:      { id: "gmax_canonazo",      name: "Gigacañonazo",        type: "agua",      class: "gigantamax", description: "Movimiento Gigamax exclusivo de Blastoise Gigamax (Tipo Agua)." },
+    gmax_latigo:        { id: "gmax_latigo",        name: "Gigalátigo",          type: "planta",    class: "gigantamax", description: "Movimiento Gigamax exclusivo de Venusaur Gigamax (Tipo Planta)." },
+    gmax_aparicion:     { id: "gmax_aparicion",     name: "Gigaparición",        type: "fantasma",  class: "gigantamax", description: "Movimiento Gigamax exclusivo de Gengar Gigamax (Tipo Fantasma)." },
+    gmax_descarga:      { id: "gmax_descarga",      name: "Gigadescarga",        type: "electrico", class: "gigantamax", description: "Movimiento Gigamax exclusivo de Toxtricity Gigamax (Tipo Eléctrico)." },
+    gmax_espuma:        { id: "gmax_espuma",        name: "Gigaespuma",          type: "agua",      class: "gigantamax", description: "Movimiento Gigamax exclusivo de Kingler Gigamax (Tipo Agua)." },
+    gmax_melodia:       { id: "gmax_melodia",       name: "Gigamelodía",         type: "hielo",     class: "gigantamax", description: "Movimiento Gigamax exclusivo de Lapras Gigamax (Tipo Hielo)." },
+    gmax_puñetazo:      { id: "gmax_puñetazo",      name: "Gigapuñetazo",        type: "lucha",     class: "gigantamax", description: "Movimiento Gigamax exclusivo de Machamp Gigamax (Tipo Lucha)." }
+  },
+
+  // ============================================================================
+  // 8. CATÁLOGO DE POKÉMON (Atacantes Meta, Gigamax, Dinamax y Jefes)
+  // ============================================================================
+  pokemon: [
+    // --------------------------------------------------------------------------
+    // ETERNATUS (Y FORMA ETERNAMAX BOSS)
+    // --------------------------------------------------------------------------
+    {
+      id: "eternatus",
+      dex: 890,
+      name: "Eternatus",
+      types: ["veneno", "dragon"],
+      baseStats: { atk: 278, def: 192, sta: 268 },
+      fastMoves: ["cola_dragon", "puya_nociva"],
+      chargedMoves: ["canon_dinamax", "rayo_infinito", "bomba_lodo", "lanzallamas"],
+      canBeShadow: false,
+      maxCapable: true,
+      maxForm: "eternamax",
+      fixedGmaxMove: "gmax_canon_dinamax",
+      isBossCandidate: true,
+      defaultBossModes: ["dmax_t5", "raid_elite", "gmax_t6"],
+      roleTag: "Meta Top #1 Dragón / Veneno & Rey Combates Max",
+      notes: "Cañón Dinamax posee una potencia colosal (215 en PvE) y se transforma en su ataque Max exclusivo en Combates Dinamax/Gigamax."
+    },
+    {
+      id: "eternatus_eternamax",
+      dex: 890,
+      name: "Eternatus (Eternamax - Jefe)",
+      types: ["veneno", "dragon"],
+      baseStats: { atk: 315, def: 505, sta: 450 },
+      fastMoves: ["cola_dragon", "puya_nociva"],
+      chargedMoves: ["canon_dinamax", "rayo_infinito", "onda_toxica", "lanzallamas"],
+      canBeShadow: false,
+      maxCapable: true,
+      maxForm: "eternamax",
+      fixedGmaxMove: "gmax_canon_dinamax",
+      isBossCandidate: true,
+      bossOnly: true,
+      defaultBossModes: ["gmax_t6", "raid_elite"],
+      roleTag: "Jefe Colosal de Evento Max",
+      notes: "Forma jefe definitiva de Eternatus con defensas extremas. Débil a Tierra, Hielo, Psíquico y Dragón."
+    },
+
+    // --------------------------------------------------------------------------
+    // DURALUDON GIGAMAX Y DINAMAX
+    // --------------------------------------------------------------------------
+    {
+      id: "duraludon_gmax",
+      dex: 884,
+      name: "Duraludon Gigamax",
+      types: ["acero", "dragon"],
+      baseStats: { atk: 239, def: 188, sta: 172 },
+      fastMoves: ["cola_dragon", "garra_metal"],
+      chargedMoves: ["garra_dragon", "foco_resplandor", "cometa_draco"],
+      canBeShadow: false,
+      maxCapable: true,
+      maxForm: "gigantamax",
+      fixedGmaxMove: "gmax_esquirla",
+      isBossCandidate: true,
+      defaultBossModes: ["gmax_t6", "dmax_t5"],
+      roleTag: "Atacante Gigamax Dragón / Tanque Acero-Dragón",
+      notes: "Su movimiento Gigaesquirla (Tipo Dragón, 450 de potencia al Nv. 3) y sus 10 resistencias elementales lo hacen clave en Combates Max."
+    },
+
+    // --------------------------------------------------------------------------
+    // INICIALES DE GALAR GIGAMAX
+    // --------------------------------------------------------------------------
+    {
+      id: "rillaboom_gmax",
+      dex: 812,
+      name: "Rillaboom Gigamax",
+      types: ["planta"],
+      baseStats: { atk: 239, def: 168, sta: 225 },
+      fastMoves: ["hoja_afilada"],
+      chargedMoves: ["planta_feroz", "hierba_lazo", "tierra_viva"],
+      canBeShadow: false,
+      maxCapable: true,
+      maxForm: "gigantamax",
+      fixedGmaxMove: "gmax_redoble",
+      isBossCandidate: true,
+      defaultBossModes: ["gmax_t6"],
+      roleTag: "Top #1 Atacante Gigamax Planta",
+      notes: "Con Gigarredoble alcanza el mayor daño por Fase Max de tipo Planta."
+    },
+    {
+      id: "cinderace_gmax",
+      dex: 815,
+      name: "Cinderace Gigamax",
+      types: ["fuego"],
+      baseStats: { atk: 238, def: 163, sta: 190 },
+      fastMoves: ["giro_fuego", "ascuas"],
+      chargedMoves: ["anillo_igneo", "lanzallamas", "sofoco"],
+      canBeShadow: false,
+      maxCapable: true,
+      maxForm: "gigantamax",
+      fixedGmaxMove: "gmax_esfera_ignea",
+      isBossCandidate: true,
+      defaultBossModes: ["gmax_t6"],
+      roleTag: "Top #1 Atacante Gigamax Fuego",
+      notes: "Gigaesfera Ígnea supera a cualquier Dinamax de Fuego por su base de 450 de poder."
+    },
+    {
+      id: "inteleon_gmax",
+      dex: 818,
+      name: "Inteleon Gigamax",
+      types: ["agua"],
+      baseStats: { atk: 262, def: 142, sta: 172 },
+      fastMoves: ["pistola_agua", "cascada"],
+      chargedMoves: ["hidrocanon", "surf", "bola_sombra"],
+      canBeShadow: false,
+      maxCapable: true,
+      maxForm: "gigantamax",
+      fixedGmaxMove: "gmax_disparo",
+      isBossCandidate: true,
+      defaultBossModes: ["gmax_t6"],
+      roleTag: "Top #1 DPS Gigamax Agua (Glass Cannon)",
+      notes: "Con 262 de Ataque base y Pistola Agua (0.5s) + Gigadisparo, es el mejor rematador de fase Max de tipo Agua."
+    },
+
+    // --------------------------------------------------------------------------
+    // INICIALES DE KANTO GIGAMAX Y OTROS GIGAMAX CLAVE
+    // --------------------------------------------------------------------------
+    {
+      id: "charizard_gmax",
+      dex: 6,
+      name: "Charizard Gigamax",
+      types: ["fuego", "volador"],
+      baseStats: { atk: 223, def: 173, sta: 186 },
+      fastMoves: ["giro_fuego", "dragoaliento", "tajo_aereo"],
+      chargedMoves: ["anillo_igneo", "garra_dragon", "sofoco"],
+      canBeShadow: false,
+      maxCapable: true,
+      maxForm: "gigantamax",
+      fixedGmaxMove: "gmax_llamarada",
+      isBossCandidate: true,
+      defaultBossModes: ["gmax_t6"],
+      roleTag: "Atacante Gigamax Fuego / Doble resistencia Tierra",
+      notes: "Dragoaliento de 0.5s carga el medidor Max a máxima velocidad antes de lanzar Gigallamarada."
+    },
+    {
+      id: "blastoise_gmax",
+      dex: 9,
+      name: "Blastoise Gigamax",
+      types: ["agua"],
+      baseStats: { atk: 171, def: 207, sta: 188 },
+      fastMoves: ["pistola_agua", "mordisco"],
+      chargedMoves: ["hidrocanon", "rayo_gelo", "foco_resplandor"],
+      canBeShadow: false,
+      maxCapable: true,
+      maxForm: "gigantamax",
+      fixedGmaxMove: "gmax_canonazo",
+      isBossCandidate: true,
+      defaultBossModes: ["gmax_t6"],
+      roleTag: "Tanque-Atacante Gigamax Agua",
+      notes: "Pistola Agua y Mordisco son movimientos de 0.5s ideales para cargar el medidor Max y proteger con Guardia Max."
+    },
+    {
+      id: "venusaur_gmax",
+      dex: 3,
+      name: "Venusaur Gigamax",
+      types: ["planta", "veneno"],
+      baseStats: { atk: 198, def: 189, sta: 190 },
+      fastMoves: ["latigo_cepa", "hoja_afilada"],
+      chargedMoves: ["planta_feroz", "bomba_lodo"],
+      canBeShadow: false,
+      maxCapable: true,
+      maxForm: "gigantamax",
+      fixedGmaxMove: "gmax_latigo",
+      isBossCandidate: true,
+      defaultBossModes: ["gmax_t6"],
+      roleTag: "Atacante/Tanque Gigamax Planta",
+      notes: "Látigo Cepa (0.5s) permite cargar el medidor Max rápidamente mientras resiste Agua, Eléctrico, Planta y Lucha."
+    },
+    {
+      id: "gengar_gmax",
+      dex: 94,
+      name: "Gengar Gigamax",
+      types: ["fantasma", "veneno"],
+      baseStats: { atk: 261, def: 149, sta: 155 },
+      fastMoves: ["garra_umbria", "lenguetazo"],
+      chargedMoves: ["bola_sombra", "bomba_lodo"],
+      canBeShadow: false,
+      maxCapable: true,
+      maxForm: "gigantamax",
+      fixedGmaxMove: "gmax_aparicion",
+      isBossCandidate: true,
+      defaultBossModes: ["gmax_t6"],
+      roleTag: "Top #1 DPS Gigamax Fantasma",
+      notes: "261 de Ataque base con Gigaparición (450 de poder al Nv. 3). Entra exclusivamente en la fase Max para dañar."
+    },
+    {
+      id: "toxtricity_gmax",
+      dex: 849,
+      name: "Toxtricity Gigamax",
+      types: ["electrico", "veneno"],
+      baseStats: { atk: 224, def: 140, sta: 181 },
+      fastMoves: ["chispa", "acido"],
+      chargedMoves: ["voltio_cruel", "chispazo", "onda_toxica"],
+      canBeShadow: false,
+      maxCapable: true,
+      maxForm: "gigantamax",
+      fixedGmaxMove: "gmax_descarga",
+      isBossCandidate: true,
+      defaultBossModes: ["gmax_t6"],
+      roleTag: "Top #1 Atacante Gigamax Eléctrico",
+      notes: "Gigadescarga domina contra jefes Agua y Volador en Combates Max."
+    },
+    {
+      id: "machamp_gmax",
+      dex: 68,
+      name: "Machamp Gigamax",
+      types: ["lucha"],
+      baseStats: { atk: 234, def: 159, sta: 207 },
+      fastMoves: ["contraataque"],
+      chargedMoves: ["puno_dinamico", "avalancha", "a_bocajarro"],
+      canBeShadow: false,
+      maxCapable: true,
+      maxForm: "gigantamax",
+      fixedGmaxMove: "gmax_puñetazo",
+      isBossCandidate: true,
+      defaultBossModes: ["gmax_t6"],
+      roleTag: "Top #1 Atacante Gigamax Lucha",
+      notes: "Esencial con Gigapuñetazo frente a jefes Max de tipo Acero, Roca, Hielo, Normal y Siniestro."
+    },
+    {
+      id: "lapras_gmax",
+      dex: 131,
+      name: "Lapras Gigamax",
+      types: ["agua", "hielo"],
+      baseStats: { atk: 165, def: 174, sta: 277 },
+      fastMoves: ["pistola_agua", "vaho_gelido"],
+      chargedMoves: ["surf", "ventisca", "rayo_gelo"],
+      canBeShadow: false,
+      maxCapable: true,
+      maxForm: "gigantamax",
+      fixedGmaxMove: "gmax_melodia",
+      isBossCandidate: true,
+      defaultBossModes: ["gmax_t6"],
+      roleTag: "Atacante Gigamax Hielo & Sanador con Espíritu Max",
+      notes: "Gran reserva de PS (277) para Espíritu Max y acceso a Gigamelodía (Tipo Hielo) contra Dragones como Eternatus o Duraludon."
+    },
+
+    // --------------------------------------------------------------------------
+    // META DINAMAX / LEGENDARIOS CORONADOS Y TANQUES MAX
+    // --------------------------------------------------------------------------
+    {
+      id: "zacian_crowned",
+      dex: 888,
+      name: "Zacian (Espada Suprema)",
+      types: ["hada", "acero"],
+      baseStats: { atk: 332, def: 240, sta: 192 },
+      fastMoves: ["garra_metal", "alarido"],
+      chargedMoves: ["tajo_supremo", "carantona", "a_bocajarro"],
+      canBeShadow: false,
+      maxCapable: true,
+      maxForm: "dynamax",
+      isBossCandidate: true,
+      defaultBossModes: ["raid_t5", "raid_elite"],
+      roleTag: "Dios del Meta Acero / Hada (Incursiones & Combates Max)",
+      notes: "Con 332 de Ataque base y Tajo Supremo, además de poder participar en Combates Max, es uno de los Pokémon más rotos del juego."
+    },
+    {
+      id: "zamazenta_crowned",
+      dex: 889,
+      name: "Zamazenta (Escudo Supremo)",
+      types: ["lucha", "acero"],
+      baseStats: { atk: 250, def: 292, sta: 192 },
+      fastMoves: ["garra_metal", "alarido"],
+      chargedMoves: ["embate_supremo", "a_bocajarro", "fuerza_lunar"],
+      canBeShadow: false,
+      maxCapable: true,
+      maxForm: "dynamax",
+      isBossCandidate: true,
+      defaultBossModes: ["raid_t5", "raid_elite"],
+      roleTag: "Muralla Suprema & Tanque #1 en Combates Max",
+      notes: "292 de Defensa base + Garra Metal (0.5s) lo convierten en el mejor tanque generador de medidor Max y usuario de Guardia Max."
+    },
+    {
+      id: "excadrill",
+      dex: 530,
+      name: "Excadrill (Dinamax / Normal)",
+      types: ["tierra", "acero"],
+      baseStats: { atk: 255, def: 129, sta: 242 },
+      fastMoves: ["disparo_lodo", "bofeton_lodo", "garra_metal"],
+      chargedMoves: ["arena_ardiente", "taladradora", "avalancha"],
+      canBeShadow: true,
+      maxCapable: true,
+      maxForm: "dynamax",
+      isBossCandidate: true,
+      defaultBossModes: ["dmax_t3"],
+      roleTag: "Counter #1 de Eternatus y Toxtricity en Combates Max",
+      notes: "Con Disparo Lodo (0.5s) genera Maxitemblor a toda velocidad mientras resiste triplemente el Veneno y doblemente el Dragón/Roca."
+    },
+    {
+      id: "metagross",
+      dex: 376,
+      name: "Metagross (Dinamax / Normal)",
+      types: ["acero", "psiquico"],
+      baseStats: { atk: 257, def: 228, sta: 190 },
+      fastMoves: ["puno_bala", "cabezazo_zen"],
+      chargedMoves: ["puno_meteoro", "psiquico", "terremoto"],
+      canBeShadow: true,
+      maxCapable: true,
+      maxForm: "dynamax",
+      isBossCandidate: true,
+      defaultBossModes: ["dmax_t3"],
+      roleTag: "Atacante/Tanque Acero y Psíquico en Raids y Dinamax",
+      notes: "Versátil en Dinamax tanto con Maxisecuela (Acero) como con Maxionda (Psíquico) contra Eternatus."
+    },
+    {
+      id: "blissey",
+      dex: 242,
+      name: "Blissey (Dinamax)",
+      types: ["normal"],
+      baseStats: { atk: 129, def: 169, sta: 496 },
+      fastMoves: ["destructor", "cabezazo_zen"],
+      chargedMoves: ["brillo_magico", "psiquico"],
+      canBeShadow: false,
+      maxCapable: true,
+      maxForm: "dynamax",
+      isBossCandidate: false,
+      roleTag: "Tanque y Sanador Definitivo en Combates Max",
+      notes: "Con 496 de PS base y Destructor (0.5s), carga el medidor Max sin morir y cura cantidades absurdas de PS a toda la patrulla con Espíritu Max Nv. 3."
+    },
+
+    // --------------------------------------------------------------------------
+    // PRINCIPALES MEGAEVOLUCIONES, PRIMIGENIOS Y FUSIONES META (RAIDS)
+    // --------------------------------------------------------------------------
+    {
+      id: "rayquaza_mega",
+      dex: 384,
+      name: "Mega Rayquaza",
+      types: ["dragon", "volador"],
+      baseStats: { atk: 377, def: 210, sta: 213 },
+      fastMoves: ["cola_dragon", "tajo_aereo"],
+      chargedMoves: ["ascenso_draco", "vasto_impacto", "enfado"],
+      canBeShadow: false,
+      maxCapable: false,
+      isMega: true,
+      isBossCandidate: true,
+      defaultBossModes: ["raid_mega_leg"],
+      roleTag: "Rey Absoluto del DPS en Incursiones (377 Ataque)",
+      notes: "Otorga +30% de daño a tipos Dragón, Volador y Psíquico en la incursión y destroza con Ascenso Draco."
+    },
+    {
+      id: "groudon_primal",
+      dex: 383,
+      name: "Groudon Primigenio",
+      types: ["tierra", "fuego"],
+      baseStats: { atk: 353, def: 268, sta: 205 },
+      fastMoves: ["disparo_lodo", "cola_dragon"],
+      chargedMoves: ["filo_del_abismo", "terremoto", "puno_fuego"],
+      canBeShadow: false,
+      maxCapable: false,
+      isMega: true,
+      isBossCandidate: true,
+      defaultBossModes: ["raid_mega_leg"],
+      roleTag: "Top #1 Atacante Tierra & Booster (+30% Tierra/Fuego/Planta)",
+      notes: "Con Disparo Lodo + Filo del Abismo es el mejor counter de incursión contra Eternatus, Duraludon, Dialga y eléctricos."
+    },
+    {
+      id: "kyogre_primal",
+      dex: 382,
+      name: "Kyogre Primigenio",
+      types: ["agua"],
+      baseStats: { atk: 353, def: 268, sta: 205 },
+      fastMoves: ["cascada"],
+      chargedMoves: ["pulso_primigenio", "surf", "ventisca"],
+      canBeShadow: false,
+      maxCapable: false,
+      isMega: true,
+      isBossCandidate: true,
+      defaultBossModes: ["raid_mega_leg"],
+      roleTag: "Top #1 Atacante Agua & Booster (+30% Agua/Eléctrico/Bicho)",
+      notes: "Cascada + Pulso Primigenio ofrece un DPS y TDO inigualables en tipo Agua."
+    },
+    {
+      id: "necrozma_dusk_mane",
+      dex: 800,
+      name: "Necrozma Melena Crepuscular",
+      types: ["psiquico", "acero"],
+      baseStats: { atk: 277, def: 220, sta: 200 },
+      fastMoves: ["garra_metal", "psicocorte", "garra_umbria"],
+      chargedMoves: ["meteoimpacto", "psiquico", "enfado"],
+      canBeShadow: false,
+      maxCapable: false,
+      isBossCandidate: true,
+      defaultBossModes: ["raid_t5"],
+      roleTag: "Top #1 Atacante Acero con Party Power (Meteoimpacto)",
+      notes: "Meteoimpacto tiene 230 de poder base; al duplicarse con Juego en Equipo (Party Power) borra barras de vida enteras."
+    },
+    {
+      id: "necrozma_dawn_wings",
+      dex: 800,
+      name: "Necrozma Alas del Alba",
+      types: ["psiquico", "fantasma"],
+      baseStats: { atk: 277, def: 220, sta: 200 },
+      fastMoves: ["garra_umbria", "psicocorte"],
+      chargedMoves: ["rayo_umbrio", "psiquico", "pulso_umbrio"],
+      canBeShadow: false,
+      maxCapable: false,
+      isBossCandidate: true,
+      defaultBossModes: ["raid_t5"],
+      roleTag: "Top #1 Atacante Fantasma / Siniestro",
+      notes: "Rayo Umbrío (230 de poder) + Garra Umbría lo sitúan por encima de cualquier otro atacante Fantasma."
+    },
+    {
+      id: "kyurem_black",
+      dex: 646,
+      name: "Kyurem Negro",
+      types: ["dragon", "hielo"],
+      baseStats: { atk: 310, def: 183, sta: 245 },
+      fastMoves: ["cola_dragon", "garra_umbria"],
+      chargedMoves: ["rayo_gelo", "enfado", "rayo_fusion"],
+      canBeShadow: false,
+      maxCapable: false,
+      isBossCandidate: true,
+      defaultBossModes: ["raid_t5"],
+      roleTag: "Top #1 Atacante Hielo / Dragón Híbrido",
+      notes: "310 de Ataque base con Rayo Gélido y Enfado. Destruye a Eternatus, Rayquaza y Landorus."
+    },
+    {
+      id: "kyurem_white",
+      dex: 646,
+      name: "Kyurem Blanco",
+      types: ["dragon", "hielo"],
+      baseStats: { atk: 310, def: 183, sta: 245 },
+      fastMoves: ["colmillo_hielo", "dragoaliento"],
+      chargedMoves: ["llama_gelo", "mundo_gelido", "llama_fusion"],
+      canBeShadow: false,
+      maxCapable: false,
+      isBossCandidate: true,
+      defaultBossModes: ["raid_t5"],
+      roleTag: "Top #1 Atacante Hielo Puro",
+      notes: "Colmillo Hielo + Llama Gélida / Mundo Gélido lo convierte en el rey absoluto contra jefes con doble debilidad a Hielo."
+    },
+    {
+      id: "mewtwo",
+      dex: 150,
+      name: "Mewtwo (Normal / Oscuro)",
+      types: ["psiquico"],
+      baseStats: { atk: 300, def: 182, sta: 214 },
+      fastMoves: ["psicocorte", "confusion"],
+      chargedMoves: ["onda_mental", "bola_sombra", "rayo_gelo"],
+      canBeShadow: true,
+      maxCapable: false,
+      isBossCandidate: true,
+      defaultBossModes: ["raid_t5", "raid_shadow_t5"],
+      roleTag: "Rey Psíquico (Especialmente Oscuro)",
+      notes: "Mewtwo Oscuro con Psicocorte + Onda Mental destroza a Eternatus y a cualquier jefe Veneno o Lucha."
+    },
+    {
+      id: "lucario_mega",
+      dex: 448,
+      name: "Mega Lucario",
+      types: ["lucha", "acero"],
+      baseStats: { atk: 310, def: 175, sta: 172 },
+      fastMoves: ["palmeo", "contraataque"],
+      chargedMoves: ["esfera_aural", "bola_sombra"],
+      canBeShadow: false,
+      maxCapable: false,
+      isMega: true,
+      isBossCandidate: true,
+      defaultBossModes: ["raid_mega"],
+      roleTag: "Top #1 Atacante Lucha en Incursiones",
+      notes: "Palmeo + Esfera Aural hacen de Mega Lucario el counter #1 contra Duraludon, Dialga, Tyranitar y Blissey."
+    },
+    {
+      id: "garchomp_mega",
+      dex: 445,
+      name: "Mega Garchomp",
+      types: ["dragon", "tierra"],
+      baseStats: { atk: 339, def: 222, sta: 239 },
+      fastMoves: ["disparo_lodo", "cola_dragon"],
+      chargedMoves: ["tierra_viva", "enfado", "terremoto"],
+      canBeShadow: false,
+      maxCapable: false,
+      isMega: true,
+      isBossCandidate: true,
+      defaultBossModes: ["raid_mega"],
+      roleTag: "Mega Atacante Dual Tierra / Dragón",
+      notes: "Excelente tanto con Disparo Lodo + Tierra Viva como con Cola Dragón + Enfado."
+    },
+    {
+      id: "tyranitar_mega",
+      dex: 248,
+      name: "Mega Tyranitar",
+      types: ["roca", "siniestro"],
+      baseStats: { atk: 309, def: 276, sta: 225 },
+      fastMoves: ["mordisco", "antiderribo"],
+      chargedMoves: ["giro_vil", "roca_afilada"],
+      canBeShadow: false,
+      maxCapable: false,
+      isMega: true,
+      isBossCandidate: true,
+      defaultBossModes: ["raid_mega"],
+      roleTag: "Top #1 Mega Siniestro & Roca con enorme TDO",
+      notes: "Con 276 de Defensa base aguanta en el campo muchísimo tiempo potenciando a todo el lobby."
+    },
+    {
+      id: "gardevoir_mega",
+      dex: 282,
+      name: "Mega Gardevoir",
+      types: ["psiquico", "hada"],
+      baseStats: { atk: 326, def: 228, sta: 169 },
+      fastMoves: ["encanto", "confusion"],
+      chargedMoves: ["brillo_magico", "psiquico"],
+      canBeShadow: false,
+      maxCapable: false,
+      isMega: true,
+      isBossCandidate: true,
+      defaultBossModes: ["raid_mega"],
+      roleTag: "Top #1 Mega Hada & Psíquico",
+      notes: "Destroza dragones como Palkia, Giratina, Kyurem y Guzzlord."
+    },
+
+    // --------------------------------------------------------------------------
+    // COUNTERS META NO-MEGA / SHADOWS Y JEFES HABITUALES
+    // --------------------------------------------------------------------------
+    {
+      id: "landorus_therian",
+      dex: 645,
+      name: "Landorus (Forma Tótem)",
+      types: ["tierra", "volador"],
+      baseStats: { atk: 289, def: 179, sta: 205 },
+      fastMoves: ["disparo_lodo"],
+      chargedMoves: ["arena_ardiente", "terremoto", "roca_afilada"],
+      canBeShadow: true,
+      maxCapable: false,
+      isBossCandidate: true,
+      defaultBossModes: ["raid_t5"],
+      roleTag: "Atacante Tierra Top (Normal y Oscuro)",
+      notes: "Disparo Lodo + Arena Ardiente ofrece uno de los mejores rendimientos Tierra contra Eternatus y Duraludon."
+    },
+    {
+      id: "mamoswine",
+      dex: 473,
+      name: "Mamoswine",
+      types: ["hielo", "tierra"],
+      baseStats: { atk: 247, def: 146, sta: 242 },
+      fastMoves: ["nieve_polvo", "bofeton_lodo"],
+      chargedMoves: ["alud", "tierra_viva"],
+      canBeShadow: true,
+      maxCapable: false,
+      isBossCandidate: false,
+      roleTag: "Atacante Hielo / Tierra Imprescindible (Especialmente Oscuro)",
+      notes: "Mamoswine Oscuro es fácil de conseguir y rinde en el top 3 tanto en Hielo (Alud) como en Tierra (Tierra Viva)."
+    },
+    {
+      id: "rhyperior",
+      dex: 464,
+      name: "Rhyperior",
+      types: ["tierra", "roca"],
+      baseStats: { atk: 241, def: 190, sta: 251 },
+      fastMoves: ["bofeton_lodo", "antiderribo"],
+      chargedMoves: ["romperrocas", "terremoto", "vasto_impacto"],
+      canBeShadow: true,
+      maxCapable: false,
+      isBossCandidate: false,
+      roleTag: "Rey Roca (Oscuro) y Tanque Tierra",
+      notes: "Bofetón Lodo + Romperrocas con Party Power es devastador."
+    },
+    {
+      id: "terrakion",
+      dex: 639,
+      name: "Terrakion",
+      types: ["roca", "lucha"],
+      baseStats: { atk: 260, def: 192, sta: 209 },
+      fastMoves: ["doble_patada", "antiderribo"],
+      chargedMoves: ["espada_santa", "avalancha"],
+      canBeShadow: false,
+      maxCapable: false,
+      isBossCandidate: true,
+      defaultBossModes: ["raid_t5"],
+      roleTag: "Top #1 Atacante Lucha No-Mega",
+      notes: "Doble Patada + Espada Santa lo hace el mejor atacante Lucha sin contar a Mega Lucario."
+    },
+    {
+      id: "kartana",
+      dex: 798,
+      name: "Kartana",
+      types: ["planta", "acero"],
+      baseStats: { atk: 323, def: 182, sta: 139 },
+      fastMoves: ["hoja_afilada"],
+      chargedMoves: ["hoja_aguda"],
+      canBeShadow: false,
+      maxCapable: false,
+      isBossCandidate: true,
+      defaultBossModes: ["raid_t5"],
+      roleTag: "Top #1 Atacante Planta en Incursiones (323 Ataque)",
+      notes: "El mayor DPS de tipo Planta en incursiones contra Kyogre, Groudon y jefes Agua/Roca/Tierra."
+    },
+    {
+      id: "xurkitree",
+      dex: 796,
+      name: "Xurkitree",
+      types: ["electrico"],
+      baseStats: { atk: 330, def: 144, sta: 195 },
+      fastMoves: ["impactrueno", "chispa"],
+      chargedMoves: ["chispazo", "voltio_cruel", "brillo_magico"],
+      canBeShadow: false,
+      maxCapable: false,
+      isBossCandidate: true,
+      defaultBossModes: ["raid_t5"],
+      roleTag: "Top #1 Atacante Eléctrico en Incursiones (330 Ataque)",
+      notes: "Su ataque base de 330 destruye jefes Volador y Agua."
+    },
+    {
+      id: "reshiram",
+      dex: 643,
+      name: "Reshiram",
+      types: ["dragon", "fuego"],
+      baseStats: { atk: 275, def: 211, sta: 205 },
+      fastMoves: ["colmillo_igneo", "dragoaliento"],
+      chargedMoves: ["llama_fusion", "sofoco", "cometa_draco"],
+      canBeShadow: false,
+      maxCapable: false,
+      isBossCandidate: true,
+      defaultBossModes: ["raid_t5"],
+      roleTag: "Top #1 Atacante Fuego Legendario",
+      notes: "Colmillo Ígneo + Llama Fusión lidera los atacantes Fuego no-Mega y funciona genial con Party Power."
+    },
+    {
+      id: "palkia_origin",
+      dex: 484,
+      name: "Palkia (Forma Origen)",
+      types: ["agua", "dragon"],
+      baseStats: { atk: 286, def: 223, sta: 189 },
+      fastMoves: ["cola_dragon", "dragoaliento"],
+      chargedMoves: ["distorsion", "hidrobomba"],
+      canBeShadow: false,
+      maxCapable: false,
+      isBossCandidate: true,
+      defaultBossModes: ["raid_t5"],
+      roleTag: "Top Atacante Dragón (Distorsión)",
+      notes: "Distorsión (160 de poder en solo 2.0s) es uno de los mejores movimientos cargados de todo Pokémon GO."
+    },
+    {
+      id: "dialga_origin",
+      dex: 483,
+      name: "Dialga (Forma Origen)",
+      types: ["acero", "dragon"],
+      baseStats: { atk: 270, def: 225, sta: 205 },
+      fastMoves: ["cola_dragon", "garra_metal"],
+      chargedMoves: ["rayo_infinito", "cabeza_hierro", "cometa_draco"],
+      canBeShadow: false,
+      maxCapable: false,
+      isBossCandidate: true,
+      defaultBossModes: ["raid_t5"],
+      roleTag: "Tanque Dragón/Acero con Distorsión Temporal",
+      notes: "Resiste Dragón mientras devuelve daño masivo; solo débil a Lucha y Tierra."
+    },
+    {
+      id: "zapdos_dmax",
+      dex: 145,
+      name: "Zapdos (Dinamax / Normal)",
+      types: ["electrico", "volador"],
+      baseStats: { atk: 253, def: 185, sta: 207 },
+      fastMoves: ["impactrueno"],
+      chargedMoves: ["chispazo", "rayo"],
+      canBeShadow: true,
+      maxCapable: true,
+      maxForm: "dynamax",
+      isBossCandidate: true,
+      defaultBossModes: ["dmax_t5", "raid_t5"],
+      roleTag: "Legendario Dinamax Eléctrico",
+      notes: "Jefe Dinamax de Nivel 5 y excelente atacante Dinamax con Impactrueno (0.5s)."
+    },
+    {
+      id: "moltres_dmax",
+      dex: 146,
+      name: "Moltres (Dinamax / Normal)",
+      types: ["fuego", "volador"],
+      baseStats: { atk: 251, def: 181, sta: 207 },
+      fastMoves: ["giro_fuego", "tajo_aereo"],
+      chargedMoves: ["sofoco", "ataque_aereo"],
+      canBeShadow: true,
+      maxCapable: true,
+      maxForm: "dynamax",
+      isBossCandidate: true,
+      defaultBossModes: ["dmax_t5", "raid_t5"],
+      roleTag: "Legendario Dinamax Fuego / Volador",
+      notes: "Jefe Dinamax de Nivel 5 con doble debilidad a Roca."
+    },
+    {
+      id: "articuno_dmax",
+      dex: 144,
+      name: "Articuno (Dinamax / Normal)",
+      types: ["hielo", "volador"],
+      baseStats: { atk: 192, def: 236, sta: 207 },
+      fastMoves: ["vaho_gelido"],
+      chargedMoves: ["rayo_gelo", "ventisca"],
+      canBeShadow: true,
+      maxCapable: true,
+      maxForm: "dynamax",
+      isBossCandidate: true,
+      defaultBossModes: ["dmax_t5", "raid_t5"],
+      roleTag: "Legendario Dinamax Hielo",
+      notes: "Jefe Dinamax de Nivel 5 y opción defensiva de Hielo contra Eternatus."
+    }
+  ],
+
+  // ============================================================================
+  // 9. CAJA DE EJEMPLO PRECARGADA (Para probar al instante o restaurar demo)
+  // ============================================================================
+  starterDemoBox: [
+    {
+      uid: "demo_eternatus_1",
+      pokemonId: "eternatus",
+      nickname: "Eternatus 100%",
+      ivAtk: 15,
+      ivDef: 15,
+      ivSta: 15,
+      levelPreset: "maxed",
+      level: 50,
+      fastMove: "cola_dragon",
+      chargedMove: "canon_dinamax",
+      isShadow: false,
+      maxClass: "eternamax",
+      maxAttackLevel: 3,
+      maxGuardLevel: 2,
+      maxSpiritLevel: 2
+    },
+    {
+      uid: "demo_duraludon_gmax_1",
+      pokemonId: "duraludon_gmax",
+      nickname: "Duraludon G-Max",
+      ivAtk: 15,
+      ivDef: 14,
+      ivSta: 14,
+      levelPreset: "no_xl",
+      level: 40,
+      fastMove: "cola_dragon",
+      chargedMove: "garra_dragon",
+      isShadow: false,
+      maxClass: "gigantamax",
+      maxAttackLevel: 3,
+      maxGuardLevel: 3,
+      maxSpiritLevel: 1
+    },
+    {
+      uid: "demo_excadrill_dmax_1",
+      pokemonId: "excadrill",
+      nickname: "Excadrill D-Max",
+      ivAtk: 15,
+      ivDef: 15,
+      ivSta: 13,
+      levelPreset: "maxed",
+      level: 50,
+      fastMove: "disparo_lodo",
+      chargedMove: "arena_ardiente",
+      isShadow: false,
+      maxClass: "dynamax",
+      maxAttackLevel: 3,
+      maxGuardLevel: 3,
+      maxSpiritLevel: 2
+    },
+    {
+      uid: "demo_groudon_primal_1",
+      pokemonId: "groudon_primal",
+      nickname: "Groudon Primigenio",
+      ivAtk: 15,
+      ivDef: 15,
+      ivSta: 15,
+      levelPreset: "maxed",
+      level: 50,
+      fastMove: "disparo_lodo",
+      chargedMove: "filo_del_abismo",
+      isShadow: false,
+      maxClass: "none",
+      maxAttackLevel: 0,
+      maxGuardLevel: 0,
+      maxSpiritLevel: 0
+    },
+    {
+      uid: "demo_mewtwo_shadow_1",
+      pokemonId: "mewtwo",
+      nickname: "Mewtwo Oscuro",
+      ivAtk: 15,
+      ivDef: 12,
+      ivSta: 14,
+      levelPreset: "maxed",
+      level: 50,
+      fastMove: "psicocorte",
+      chargedMove: "onda_mental",
+      isShadow: true,
+      maxClass: "none",
+      maxAttackLevel: 0,
+      maxGuardLevel: 0,
+      maxSpiritLevel: 0
+    },
+    {
+      uid: "demo_rayquaza_mega_1",
+      pokemonId: "rayquaza_mega",
+      nickname: "Mega Rayquaza",
+      ivAtk: 15,
+      ivDef: 15,
+      ivSta: 14,
+      levelPreset: "maxed",
+      level: 50,
+      fastMove: "cola_dragon",
+      chargedMove: "ascenso_draco",
+      isShadow: false,
+      maxClass: "none",
+      maxAttackLevel: 0,
+      maxGuardLevel: 0,
+      maxSpiritLevel: 0
+    },
+    {
+      uid: "demo_kyurem_black_1",
+      pokemonId: "kyurem_black",
+      nickname: "Kyurem Negro",
+      ivAtk: 15,
+      ivDef: 14,
+      ivSta: 15,
+      levelPreset: "no_xl",
+      level: 40,
+      fastMove: "cola_dragon",
+      chargedMove: "rayo_gelo",
+      isShadow: false,
+      maxClass: "none",
+      maxAttackLevel: 0,
+      maxGuardLevel: 0,
+      maxSpiritLevel: 0
+    },
+    {
+      uid: "demo_blissey_dmax_1",
+      pokemonId: "blissey",
+      nickname: "Blissey Tanque Max",
+      ivAtk: 13,
+      ivDef: 15,
+      ivSta: 15,
+      levelPreset: "no_xl",
+      level: 40,
+      fastMove: "destructor",
+      chargedMove: "brillo_magico",
+      isShadow: false,
+      maxClass: "dynamax",
+      maxAttackLevel: 1,
+      maxGuardLevel: 3,
+      maxSpiritLevel: 3
+    }
+  ]
+};
+
+// Exportar tanto al objeto global window (para ejecución directa o scripts clásicos) como módulo ES
+if (typeof window !== "undefined") {
+  window.POKE_DB = POKE_DB;
+}
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = POKE_DB;
+}
