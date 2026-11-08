@@ -226,8 +226,8 @@
                 <!-- Tarjeta Visual de Jefe Seleccionado -->
                 <div id="boss-selected-card" class="p-3 rounded-xl bg-gradient-to-r from-slate-950 to-cyan-950/40 border border-cyan-500/40 flex items-center justify-between gap-3 shadow-md">
                   <div class="flex items-center gap-3 min-w-0">
-                    <div class="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-xl shrink-0">
-                      👾
+                    <div id="boss-selected-icon-wrap" class="w-12 h-12 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center p-1 shrink-0 overflow-hidden">
+                      <img id="boss-selected-img" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/484.png" alt="Palkia" class="w-full h-full object-contain filter drop-shadow" onerror="this.style.display='none'" />
                     </div>
                     <div class="min-w-0">
                       <div class="flex items-center gap-2">
@@ -325,10 +325,13 @@
 
           <!-- Tarjeta de Modificadores y Condiciones de Combate -->
           <div class="bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
-            <h2 class="font-display text-xs sm:text-base font-bold uppercase tracking-wider text-pink-400 flex items-center gap-2">
-              <span class="w-2.5 h-2.5 rounded-full bg-pink-500"></span>
-              2. Modificadores de Combate
-            </h2>
+            <div class="flex items-center justify-between">
+              <h2 class="font-display text-xs sm:text-base font-bold uppercase tracking-wider text-pink-400 flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-pink-500"></span>
+                <span>2. Opciones y Modificadores de Combate</span>
+              </h2>
+              <span class="text-[10px] font-mono text-slate-400 uppercase">Multiplicadores PoGO</span>
+            </div>
 
             <!-- Juego en Equipo (Party Power) -->
             <div id="party-power-container" class="p-3.5 rounded-xl bg-gradient-to-r from-indigo-950/70 via-slate-900 to-purple-950/60 border border-indigo-500/40 space-y-3">
@@ -336,9 +339,10 @@
                 <div>
                   <label for="toggle-party-power" class="text-sm font-bold text-indigo-200 flex items-center gap-1.5 cursor-pointer">
                     <span>⚡ Juego en Equipo (Party Power)</span>
+                    <span id="party-power-status-badge" class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-pink-500/25 text-pink-300 border border-pink-500/40">x2.0 CARGADOS</span>
                   </label>
-                  <p class="text-[11px] text-slate-400">
-                    Duplica (x2.0) el daño de ataques cargados.
+                  <p class="text-[11px] text-slate-400 mt-0.5">
+                    Duplica el daño de los ataques cargados cuando el medidor de equipo se llena.
                   </p>
                 </div>
                 <input
@@ -351,31 +355,49 @@
 
               <div id="party-size-selector-wrap" class="pt-1">
                 <label class="block text-[11px] font-semibold uppercase tracking-wider text-indigo-300 mb-1.5">
-                  Miembros en tu Party
+                  Jugadores en tu Grupo de Juego en Equipo:
                 </label>
                 <div class="grid grid-cols-3 gap-2">
                   <button type="button" data-party-size="2" class="party-size-btn min-h-[40px] py-1.5 px-2 rounded-lg text-xs font-bold border border-indigo-500/50 bg-indigo-600/30 text-white">
-                    2 Jug.
+                    👥 2 Jugadores
                   </button>
                   <button type="button" data-party-size="3" class="party-size-btn min-h-[40px] py-1.5 px-2 rounded-lg text-xs font-semibold border border-slate-700 bg-slate-900 text-slate-300 hover:border-indigo-400">
-                    3 Jug.
+                    👥 3 Jugadores
                   </button>
                   <button type="button" data-party-size="4" class="party-size-btn min-h-[40px] py-1.5 px-2 rounded-lg text-xs font-semibold border border-slate-700 bg-slate-900 text-slate-300 hover:border-indigo-400">
-                    4 Jug.
+                    👥 4 Jugadores
                   </button>
                 </div>
               </div>
             </div>
 
-            <!-- Nivel de Amistad -->
-            <div>
-              <label for="select-friendship" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
-                Nivel de Amistad
-              </label>
-              <select
-                id="select-friendship"
-                class="w-full min-h-[44px] rounded-xl bg-slate-950 border border-slate-700/80 px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-400"
-              >
+            <!-- Nivel de Amistad con Botones Táctiles Claros -->
+            <div class="space-y-1.5">
+              <div class="flex items-center justify-between">
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  Nivel de Amistad
+                </label>
+                <span id="friendship-multiplier-label" class="text-[11px] font-mono text-cyan-300 font-bold">+10% Daño (Mejor Amigo)</span>
+              </div>
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5" id="friendship-buttons-grid">
+                <button type="button" data-friendship-val="none" class="friendship-btn p-2 rounded-lg text-xs font-semibold border border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200">
+                  Sin Amistad (1.00x)
+                </button>
+                <button type="button" data-friendship-val="good" class="friendship-btn p-2 rounded-lg text-xs font-semibold border border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200">
+                  ❤️ Buena (+3%)
+                </button>
+                <button type="button" data-friendship-val="great" class="friendship-btn p-2 rounded-lg text-xs font-semibold border border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200">
+                  ❤️❤️ Gran (+5%)
+                </button>
+                <button type="button" data-friendship-val="ultra" class="friendship-btn p-2 rounded-lg text-xs font-semibold border border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200">
+                  ❤️❤️❤️ Ultra (+7%)
+                </button>
+                <button type="button" data-friendship-val="best" class="friendship-btn p-2 rounded-lg text-xs font-bold border border-cyan-400/80 bg-cyan-500/25 text-cyan-200 shadow-sm col-span-2 sm:col-span-2">
+                  💖 Mejor Amigo (+10% / 1.10x)
+                </button>
+              </div>
+              <!-- Selector oculto sincronizado -->
+              <select id="select-friendship" class="hidden">
                 <option value="none">Sin Amistad (1.00x)</option>
                 <option value="good">Buen Amigo (+3% / 1.03x)</option>
                 <option value="great">Gran Amigo (+5% / 1.05x)</option>
@@ -384,42 +406,52 @@
               </select>
             </div>
 
-            <!-- Bono Mega -->
-            <div>
-              <label for="select-mega-bonus" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
-                Bono de Megaevolución Aliada
+            <!-- Bono de Megaevolución Aliada con Botones Claros -->
+            <div class="space-y-1.5">
+              <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">
+                Megaevolución Aliada en el Combate
               </label>
-              <select
-                id="select-mega-bonus"
-                class="w-full min-h-[44px] rounded-xl bg-slate-950 border border-slate-700/80 px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-400"
-              >
+              <div class="grid grid-cols-3 gap-1.5" id="mega-bonus-buttons-grid">
+                <button type="button" data-mega-val="none" class="mega-bonus-btn p-2 rounded-lg text-xs font-bold border border-cyan-400/80 bg-cyan-500/25 text-cyan-200">
+                  ❌ Sin Mega (0%)
+                </button>
+                <button type="button" data-mega-val="diff" class="mega-bonus-btn p-2 rounded-lg text-xs font-semibold border border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200">
+                  ✨ Otro Tipo (+10%)
+                </button>
+                <button type="button" data-mega-val="same" class="mega-bonus-btn p-2 rounded-lg text-xs font-semibold border border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200">
+                  🔥 Mismo Tipo (+30%)
+                </button>
+              </div>
+              <!-- Selector oculto sincronizado -->
+              <select id="select-mega-bonus" class="hidden">
                 <option value="none" selected>Sin Mega aliada activa (0%)</option>
                 <option value="diff">Mega activa otro tipo (+10%)</option>
                 <option value="same">Mega del mismo tipo (+30%)</option>
               </select>
             </div>
 
-            <!-- Clima -->
-            <div class="flex items-center justify-between gap-3 p-3.5 rounded-xl bg-slate-950/80 border border-slate-800">
+            <!-- Clima Favorable Interactivo -->
+            <label for="toggle-weather-boost" class="flex items-center justify-between gap-3 p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-amber-500/40 cursor-pointer transition">
               <div>
-                <label for="toggle-weather-boost" class="text-sm font-semibold text-slate-200 cursor-pointer">
-                  ☀️ Clima a Favor (+20% Daño)
-                </label>
-                <p class="text-[11px] text-slate-400">
-                  Potencia tus ataques eficaces con el bono del tiempo atmosférico.
+                <span class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                  <span>☀️ Clima Favorable</span>
+                  <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">+20% DAÑO</span>
+                </span>
+                <p class="text-[11px] text-slate-400 mt-0.5">
+                  Potencia los ataques rápidos y cargados correspondientes al tiempo atmosférico activo.
                 </p>
               </div>
               <input
                 id="toggle-weather-boost"
                 type="checkbox"
-                class="w-6 h-6 accent-cyan-400 rounded cursor-pointer shrink-0"
+                class="w-6 h-6 accent-amber-400 rounded cursor-pointer shrink-0"
               />
-            </div>
+            </label>
 
             <button
               id="btn-run-optimizer"
               type="button"
-              class="w-full min-h-[48px] py-3 px-4 rounded-xl font-display font-bold text-xs sm:text-sm uppercase tracking-wider bg-gradient-to-r from-cyan-500 via-blue-600 to-pink-600 hover:from-cyan-400 hover:to-pink-500 text-white shadow-lg shadow-pink-500/20 transition transform active:scale-[0.98]"
+              class="w-full min-h-[50px] py-3.5 px-4 rounded-xl font-display font-bold text-xs sm:text-sm uppercase tracking-wider bg-gradient-to-r from-cyan-500 via-blue-600 to-pink-600 hover:from-cyan-400 hover:to-pink-500 text-white shadow-xl shadow-cyan-500/20 transition transform active:scale-[0.98] cursor-pointer"
             >
               ⚡ Calcular Equipo Ideal y Jugadores
             </button>
@@ -677,8 +709,8 @@
               <!-- Tarjeta Visual de Especie Seleccionada -->
               <div id="species-selected-card" class="p-3 rounded-xl bg-gradient-to-r from-slate-950 to-indigo-950/40 border border-indigo-500/40 flex items-center justify-between gap-3 shadow-md">
                 <div class="flex items-center gap-3 min-w-0">
-                  <div class="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-400/40 flex items-center justify-center text-xl shrink-0">
-                    ⭐
+                  <div id="species-selected-icon-wrap" class="w-12 h-12 rounded-xl bg-indigo-500/20 border border-indigo-400/40 flex items-center justify-center p-1 shrink-0 overflow-hidden">
+                    <img id="species-selected-img" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/484.png" alt="Palkia" class="w-full h-full object-contain filter drop-shadow" onerror="this.style.display='none'" />
                   </div>
                   <div class="min-w-0">
                     <div class="flex items-center gap-2">
@@ -971,20 +1003,54 @@
               </button>
             </div>
 
-            <!-- Filtros Rápidos -->
-            <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-0.5">
-              <button type="button" data-box-tag="all" class="box-tag-btn px-3 py-1 rounded-full text-xs font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0">
-                Todos
-              </button>
-              <button type="button" data-box-tag="max" class="box-tag-btn px-3 py-1 rounded-full text-xs font-semibold bg-slate-950 text-slate-400 border border-slate-800 hover:text-pink-300 shrink-0">
-                🌀 Max
-              </button>
-              <button type="button" data-box-tag="shadow" class="box-tag-btn px-3 py-1 rounded-full text-xs font-semibold bg-slate-950 text-slate-400 border border-slate-800 hover:text-purple-300 shrink-0">
-                🟣 Oscuros
-              </button>
-              <button type="button" data-box-tag="hundo" class="box-tag-btn px-3 py-1 rounded-full text-xs font-semibold bg-slate-950 text-slate-400 border border-slate-800 hover:text-amber-300 shrink-0">
-                ⭐ 100% IV
-              </button>
+            <!-- Filtros Rápidos, Ordenación y Copia de Seguridad -->
+            <div class="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+              <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                <button type="button" data-box-tag="all" class="box-tag-btn px-3 py-1 rounded-full text-xs font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0">
+                  Todos
+                </button>
+                <button type="button" data-box-tag="max" class="box-tag-btn px-3 py-1 rounded-full text-xs font-semibold bg-slate-950 text-slate-400 border border-slate-800 hover:text-pink-300 shrink-0">
+                  🌀 Max
+                </button>
+                <button type="button" data-box-tag="shadow" class="box-tag-btn px-3 py-1 rounded-full text-xs font-semibold bg-slate-950 text-slate-400 border border-slate-800 hover:text-purple-300 shrink-0">
+                  🟣 Oscuros
+                </button>
+                <button type="button" data-box-tag="hundo" class="box-tag-btn px-3 py-1 rounded-full text-xs font-semibold bg-slate-950 text-slate-400 border border-slate-800 hover:text-amber-300 shrink-0">
+                  ⭐ 100% IV
+                </button>
+              </div>
+
+              <div class="flex items-center gap-1.5 shrink-0">
+                <select
+                  id="select-box-sort"
+                  class="min-h-[34px] rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-1 text-xs font-bold text-slate-200 focus:outline-none focus:border-cyan-400"
+                  title="Ordenar colección"
+                >
+                  <option value="pc_desc">Mayor PC 🔻</option>
+                  <option value="iv_desc">Mayor IV % ⭐</option>
+                  <option value="level_desc">Mayor Nivel 🔝</option>
+                  <option value="dex_asc">Nº Pokédex #️⃣</option>
+                  <option value="name_asc">Nombre (A - Z)</option>
+                </select>
+
+                <button
+                  type="button"
+                  id="btn-export-box"
+                  class="min-h-[34px] px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
+                  title="Descargar copia de seguridad en archivo JSON"
+                >
+                  📥 Backup
+                </button>
+                <button
+                  type="button"
+                  id="btn-import-box-trigger"
+                  class="min-h-[34px] px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
+                  title="Restaurar copia de seguridad desde archivo JSON"
+                >
+                  📤 Restaurar
+                </button>
+                <input type="file" id="input-import-box" accept=".json" class="hidden" />
+              </div>
             </div>
           </div>
 

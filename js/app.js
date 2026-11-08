@@ -22,6 +22,7 @@
     weatherBoost: false,
     boxFilterQuery: "",
     boxFilterTag: "all",
+    boxSort: "pc_desc",
     boxSelectedOwner: "me",
     activeCombatFriendIds: [],
     dexFilterQuery: "",
@@ -450,10 +451,16 @@
       const cardDex = document.getElementById("species-selected-dex");
       const cardName = document.getElementById("species-selected-name");
       const cardTypes = document.getElementById("species-selected-types");
+      const cardImg = document.getElementById("species-selected-img");
       if (cardDex) cardDex.textContent = `#${species.dex}`;
       if (cardName) cardName.textContent = species.name;
       if (cardTypes) {
         cardTypes.innerHTML = species.types.map((t) => renderTypeBadge(t)).join(" ");
+      }
+      if (cardImg) {
+        cardImg.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${species.dex}.png`;
+        cardImg.alt = species.name;
+        cardImg.style.display = "block";
       }
 
       const fastSelect = document.getElementById("select-box-fast");
@@ -655,7 +662,97 @@
       runOptimizerCalculation();
     });
 
+    const boxSortSelect = document.getElementById("select-box-sort");
+    if (boxSortSelect) {
+      boxSortSelect.addEventListener("change", () => {
+        state.boxSort = boxSortSelect.value;
+        renderMyBoxCards();
+      });
+    }
+
+    const exportBtn = document.getElementById("btn-export-box");
+    if (exportBtn) {
+      exportBtn.addEventListener("click", () => {
+        exportBackupData();
+      });
+    }
+
+    const importTriggerBtn = document.getElementById("btn-import-box-trigger");
+    const importInput = document.getElementById("input-import-box");
+    if (importTriggerBtn && importInput) {
+      importTriggerBtn.addEventListener("click", () => {
+        importInput.click();
+      });
+      importInput.addEventListener("change", (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (file) {
+          importBackupData(file);
+          importInput.value = "";
+        }
+      });
+    }
+
     populateSpeciesOptions("", false);
+  }
+
+  function exportBackupData() {
+    const box = global.PokeBoxManager.getAll("all");
+    const friends = global.PokeBoxManager.getFriends();
+    const data = {
+      version: 3,
+      exportedAt: new Date().toISOString(),
+      appName: "PokéRaid & Max Optimizer",
+      box,
+      friends
+    };
+
+    const jsonStr = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `pokeraid_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showNotification("Copia de seguridad descargada correctamente 📥", "success");
+  }
+
+  function importBackupData(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const parsed = JSON.parse(e.target.result);
+        if (!parsed || !Array.isArray(parsed.box)) {
+          showNotification("El archivo JSON no tiene un formato válido de PokéRaid", "error");
+          return;
+        }
+
+        global.localStorage.setItem(
+          global.PokeBoxManager.STORAGE_KEY_BOX,
+          JSON.stringify(parsed.box)
+        );
+        if (Array.isArray(parsed.friends)) {
+          global.localStorage.setItem(
+            global.PokeBoxManager.STORAGE_KEY_FRIENDS,
+            JSON.stringify(parsed.friends)
+          );
+        }
+
+        populateOwnerSelectors();
+        renderMyBoxCards();
+        runOptimizerCalculation();
+        showNotification(
+          `Copia restaurada con éxito: ${parsed.box.length} Pokémon y ${(parsed.friends || []).length} amigos 📤`,
+          "success"
+        );
+      } catch (err) {
+        console.error("Error importando backup:", err);
+        showNotification("Error al procesar el archivo de copia de seguridad", "error");
+      }
+    };
+    reader.readAsText(file);
   }
 
   function resetBoxForm() {
@@ -813,6 +910,17 @@
       return;
     }
 
+    // Ordenación configurable
+    const sortMode = state.boxSort || "pc_desc";
+    filtered.sort((a, b) => {
+      if (sortMode === "pc_desc") return b.cp - a.cp;
+      if (sortMode === "iv_desc") return b.ivPct - a.ivPct;
+      if (sortMode === "level_desc") return b.level - a.level;
+      if (sortMode === "dex_asc") return a.species.dex - b.species.dex;
+      if (sortMode === "name_asc") return a.nickname.localeCompare(b.nickname);
+      return b.cp - a.cp;
+    });
+
     grid.innerHTML = filtered
       .map((item) => {
         const typeBadges = item.species.types.map((t) => renderTypeBadge(t)).join(" ");
@@ -847,15 +955,20 @@
             item.isShadow ? "glow-shadow-poke" : item.maxMoveInfo.isMaxCapable ? "glow-dynamax" : ""
           }">
             <div>
-              <div class="flex items-start justify-between gap-2">
-                <div class="min-w-0">
-                  <div class="flex items-center gap-1.5 flex-wrap">
-                    ${ownerBadge}
-                    <span class="font-mono text-[11px] text-slate-400">#${item.species.dex}</span>
-                    <span class="px-2 py-0.5 rounded-full font-mono text-[11px] font-extrabold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">PC ${item.cp}</span>
-                    <span class="font-mono text-[11px] text-slate-400">${item.levelBadge}</span>
+              <div class="flex items-start justify-between gap-2.5">
+                <div class="flex items-center gap-3 min-w-0">
+                  <div class="w-12 h-12 rounded-xl bg-slate-900 border border-slate-800 p-0.5 shrink-0 flex items-center justify-center overflow-hidden">
+                    <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${item.species.dex}.png" alt="${item.species.name}" class="w-full h-full object-contain filter drop-shadow" onerror="this.style.display='none'" />
                   </div>
-                  <h3 class="text-sm sm:text-base font-extrabold text-white mt-1 truncate">${item.nickname}</h3>
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                      ${ownerBadge}
+                      <span class="font-mono text-[11px] text-slate-400">#${item.species.dex}</span>
+                      <span class="px-2 py-0.5 rounded-full font-mono text-[11px] font-extrabold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">PC ${item.cp}</span>
+                      <span class="font-mono text-[11px] text-slate-400">${item.levelBadge}</span>
+                    </div>
+                    <h3 class="text-sm sm:text-base font-extrabold text-white mt-0.5 truncate">${item.nickname}</h3>
+                  </div>
                 </div>
                 <div class="flex flex-wrap gap-1 justify-end shrink-0">
                   ${typeBadges}
@@ -1029,10 +1142,16 @@
       const cardDex = document.getElementById("boss-selected-dex");
       const cardName = document.getElementById("boss-selected-name");
       const cardTypes = document.getElementById("boss-selected-types");
+      const cardImg = document.getElementById("boss-selected-img");
       if (cardDex) cardDex.textContent = `#${boss.dex}`;
       if (cardName) cardName.textContent = boss.name;
       if (cardTypes) {
         cardTypes.innerHTML = boss.types.map((t) => renderTypeBadge(t)).join(" ");
+      }
+      if (cardImg) {
+        cardImg.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${boss.dex}.png`;
+        cardImg.alt = boss.name;
+        cardImg.style.display = "block";
       }
 
       if (Array.isArray(boss.defaultBossModes) && boss.defaultBossModes.length > 0) {
@@ -1171,8 +1290,15 @@
       runOptimizerCalculation();
     });
 
+    const partyPowerBadge = document.getElementById("party-power-status-badge");
     partyToggle.addEventListener("change", () => {
       state.partyPowerEnabled = partyToggle.checked;
+      if (partyPowerBadge) {
+        partyPowerBadge.textContent = state.partyPowerEnabled ? "x2.0 CARGADOS" : "DESACTIVADO";
+        partyPowerBadge.className = state.partyPowerEnabled
+          ? "px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-pink-500/25 text-pink-300 border border-pink-500/40"
+          : "px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-400 border border-slate-700";
+      }
       document
         .getElementById("party-size-selector-wrap")
         .classList.toggle("opacity-40", !state.partyPowerEnabled);
@@ -1192,14 +1318,55 @@
       });
     });
 
-    friendshipSelect.addEventListener("change", () => {
-      state.friendship = friendshipSelect.value;
-      runOptimizerCalculation();
+    // Botones visuales de Nivel de Amistad
+    const friendshipBtns = document.querySelectorAll(".friendship-btn");
+    const friendshipLabel = document.getElementById("friendship-multiplier-label");
+    const friendshipDescMap = {
+      none: "Sin Bonus (1.00x)",
+      good: "+3% Daño (Buen Amigo)",
+      great: "+5% Daño (Gran Amigo)",
+      ultra: "+7% Daño (Ultra Amigo)",
+      best: "+10% Daño (Mejor Amigo)"
+    };
+
+    friendshipBtns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const val = btn.getAttribute("data-friendship-val");
+        state.friendship = val;
+        if (friendshipSelect) friendshipSelect.value = val;
+        if (friendshipLabel) {
+          friendshipLabel.textContent = friendshipDescMap[val] || "+10% Daño";
+        }
+        friendshipBtns.forEach((b) => {
+          const isAct = b.getAttribute("data-friendship-val") === state.friendship;
+          const isColSpan = b.getAttribute("data-friendship-val") === "best";
+          b.className = isAct
+            ? `friendship-btn p-2 rounded-lg text-xs font-bold border border-cyan-400/80 bg-cyan-500/25 text-cyan-200 shadow-sm${
+                isColSpan ? " col-span-2 sm:col-span-2" : ""
+              }`
+            : `friendship-btn p-2 rounded-lg text-xs font-semibold border border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200${
+                isColSpan ? " col-span-2 sm:col-span-2" : ""
+              }`;
+        });
+        runOptimizerCalculation();
+      });
     });
 
-    megaSelect.addEventListener("change", () => {
-      state.megaBonus = megaSelect.value;
-      runOptimizerCalculation();
+    // Botones visuales de Mega Aliada
+    const megaBtns = document.querySelectorAll(".mega-bonus-btn");
+    megaBtns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const val = btn.getAttribute("data-mega-val");
+        state.megaBonus = val;
+        if (megaSelect) megaSelect.value = val;
+        megaBtns.forEach((b) => {
+          const isAct = b.getAttribute("data-mega-val") === state.megaBonus;
+          b.className = isAct
+            ? "mega-bonus-btn p-2 rounded-lg text-xs font-bold border border-cyan-400/80 bg-cyan-500/25 text-cyan-200 shadow-sm"
+            : "mega-bonus-btn p-2 rounded-lg text-xs font-semibold border border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200";
+        });
+        runOptimizerCalculation();
+      });
     });
 
     weatherToggle.addEventListener("change", () => {
@@ -1433,31 +1600,48 @@
             : "";
 
         return `
-          <div class="p-3.5 sm:p-4 rounded-xl bg-slate-950/90 border border-slate-800 hover:border-pink-500/50 transition flex flex-col justify-between">
+          <div class="p-3.5 sm:p-4 rounded-xl bg-slate-950/90 border border-slate-800 hover:border-pink-500/50 transition flex flex-col justify-between shadow-lg">
             <div>
-              <div class="flex items-center justify-between gap-2 mb-2">
+              <div class="flex items-center justify-between gap-2 mb-2.5">
                 <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border truncate ${item.roleBadgeClass}">
                   ${item.roleLabel}
                 </span>
                 ${effBadge}
               </div>
 
-              <div class="flex items-baseline justify-between gap-2">
-                <h4 class="text-sm sm:text-base font-extrabold text-white truncate">
-                  ${entry.nickname}
-                  ${entry.isShadow ? '<span class="text-purple-400 text-xs">(Oscuro)</span>' : ""}
-                </h4>
-                <span class="font-mono text-xs font-bold text-cyan-300 shrink-0">PC ${entry.cp} · ${entry.levelBadge}</span>
+              <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-xl bg-slate-900 border border-slate-700/80 flex items-center justify-center p-1 shrink-0 overflow-hidden shadow-inner">
+                  <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${entry.species.dex}.png" alt="${entry.nickname}" class="w-full h-full object-contain filter drop-shadow" onerror="this.style.display='none'" />
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-baseline justify-between gap-2">
+                    <h4 class="text-sm sm:text-base font-extrabold text-white truncate">
+                      ${entry.nickname}
+                      ${entry.isShadow ? '<span class="text-purple-400 text-xs font-semibold">(Oscuro)</span>' : ""}
+                    </h4>
+                    <span class="font-mono text-xs font-bold text-cyan-300 shrink-0">PC ${entry.cp}</span>
+                  </div>
+                  <div class="text-[11px] font-mono text-slate-400 flex items-center gap-2 mt-0.5">
+                    <span>${entry.levelBadge}</span>
+                    <span class="text-slate-600">·</span>
+                    <span class="text-amber-300 font-bold">IV ${entry.ivPct}%</span>
+                    ${entry.ownerName && entry.ownerName !== "Tú" ? `<span class="text-indigo-300 text-[10px] bg-indigo-950/60 px-1.5 py-0.2 rounded border border-indigo-500/30">👤 ${entry.ownerName}</span>` : ""}
+                  </div>
+                </div>
               </div>
 
-              <div class="mt-2 space-y-1 text-xs text-slate-300">
-                <div class="flex justify-between">
-                  <span class="text-slate-400">Rápido:</span>
-                  <span class="font-semibold">${entry.fastMoveObj.name} (${entry.fastMoveObj.durationMs / 1000}s)</span>
+              <div class="mt-3 p-2.5 rounded-lg bg-slate-900/80 border border-slate-800/80 space-y-1 text-xs text-slate-300">
+                <div class="flex items-center justify-between">
+                  <span class="text-slate-400 flex items-center gap-1">
+                    <span class="text-[10px] px-1 py-0.2 rounded bg-slate-800 text-slate-300 font-mono">Rápido</span>
+                  </span>
+                  <span class="font-semibold text-slate-200">${entry.fastMoveObj.name} <span class="text-slate-500 font-mono text-[10px]">(${entry.fastMoveObj.durationMs / 1000}s)</span></span>
                 </div>
-                <div class="flex justify-between">
-                  <span class="text-slate-400">Cargado:</span>
-                  <span class="font-semibold">${entry.chargedMoveObj.name}</span>
+                <div class="flex items-center justify-between">
+                  <span class="text-slate-400 flex items-center gap-1">
+                    <span class="text-[10px] px-1 py-0.2 rounded bg-slate-800 text-slate-300 font-mono">Cargado</span>
+                  </span>
+                  <span class="font-semibold text-cyan-200">${entry.chargedMoveObj.name}</span>
                 </div>
               </div>
 
@@ -1465,17 +1649,17 @@
             </div>
 
             <div class="mt-3 pt-2.5 border-t border-slate-800/90 grid grid-cols-3 text-center font-mono text-xs">
-              <div>
-                <span class="block text-[10px] text-slate-500">DPS</span>
-                <strong class="text-cyan-300">${item.dps}/s</strong>
+              <div class="p-1 rounded bg-slate-900/50">
+                <span class="block text-[10px] text-slate-400 uppercase tracking-wider font-semibold">DPS</span>
+                <strong class="text-cyan-300 font-bold">${item.dps}/s</strong>
               </div>
-              <div>
-                <span class="block text-[10px] text-slate-500">TDO</span>
-                <strong class="text-pink-400">${item.tdo}</strong>
+              <div class="p-1 rounded bg-slate-900/50">
+                <span class="block text-[10px] text-slate-400 uppercase tracking-wider font-semibold">TDO</span>
+                <strong class="text-pink-400 font-bold">${item.tdo}</strong>
               </div>
-              <div>
-                <span class="block text-[10px] text-slate-500">AGUANTE</span>
-                <strong class="text-emerald-400">${item.timeToFaintSec}s</strong>
+              <div class="p-1 rounded bg-slate-900/50">
+                <span class="block text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Aguante</span>
+                <strong class="text-emerald-400 font-bold">${item.timeToFaintSec}s</strong>
               </div>
             </div>
           </div>
