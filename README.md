@@ -9,14 +9,15 @@ Aplicación web interactiva para **Pokémon GO** que gestiona tu **Caja de Poké
   - Incluye a **Zacian (Espada Suprema)**, **Zamazenta (Escudo Supremo)**, **Mega Rayquaza**, **Groudon y Kyogre Primigenios**, **Necrozma Melena Crepuscular / Alas del Alba**, **Kyurem Negro / Blanco**, **Mewtwo Oscuro**, **Excadrill Dinamax**, **Blissey Dinamax** y los principales counters del meta.
 
 - **Módulo 1: Mi Caja y Amigos Fijos (`js/box.js`):**
+  - **Cálculo Automático de Nivel por PC**: Introduce directamente los **Puntos de Combate (PC)** y los IVs de tu Pokémon; la web calcula su nivel exacto (de 1.0 a 51.0 en pasos de 0.5) y estadísticas reales.
   - **Plantillas Rápidas 1-Tap**: Botones instantáneos para configurar en 1 toque (`⭐ 100% Nv. 50`, `⚔️ Raid Nv. 40`, `🌱 Atrapado Nv. 20`).
-  - **Equipos de Amigos Fijos**: Registra a tus amigos reales y guarda sus Pokémon con sus IVs y ataques para simular incursiones en grupo.
-  - Búsqueda con lupa y autocompletado en todos los apartados (insensible a tildes y mayúsculas).
-  - Persistencia automática en `localStorage`.
+  - **Equipos de Amigos Fijos**: Registra a tus amigos habituales y guarda sus Pokémon reales para simular incursiones juntos.
+  - **Backup JSON y Ordenación**: Ordena por PC, IV%, Nivel o Pokédex, y exporta/importa copias de seguridad en `.json`.
 
 - **Módulo 2 y 3: Motor Matemático PvE y Simulación Co-op (`js/engine.js` & `js/app.js`):**
   - Fórmula oficial de daño de Pokémon GO con `CPM`, `STAB (1.2x)`, debilidades elementales (`1.6x` y `2.56x`), Amistad, Clima, Mega activa y **Juego en Equipo (Party Power de 2, 3 o 4 jugadores)**.
-  - **Simulación Co-op Real**: Selecciona los amigos que van contigo al combate para sumar su daño real al tuyo.
+  - **Compañeros Random por Nivel**: Añade jugadores desconocidos que entren a la sala categorizándolos en **Nivel Alto (Nv. 40-50)**, **Nivel Medio (Nv. 30-39)** o **Nivel Bajo (Nv. 20-29)** para sumar su daño estimado al grupo.
+  - **Simulación Co-op Real**: Combina tu equipo + equipos de amigos fijos + compañeros random en tiempo real.
   - **Desglose Ultra-Claro de Compañeros Necesarios**:
     - *🔥 Hardcore*: Compañeros con meta Nv. 40-50 y Party Power (~35% daño c/u).
     - *⚡ Estándar*: Compañeros de nivel medio Nv. 30-35 (~20% daño c/u).
