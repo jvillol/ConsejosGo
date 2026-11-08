@@ -64,37 +64,50 @@
               POKÉRAID <span class="text-pink-500">&amp; MAX</span>
             </h1>
             <span class="hidden md:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-widest bg-pink-500/20 text-pink-300 border border-pink-500/40">
-              v2.6 MOBILE
+              v2.7 CO-OP &amp; FRIENDS
             </span>
           </div>
           <p class="text-[11px] sm:text-xs text-slate-400 truncate">
-            Optimizador PvE · Raids · Dinamax &amp; Gigamax
+            Optimizador PvE · Raids · Dinamax/Gigamax · Equipos con Amigos
           </p>
         </div>
       </div>
 
-      <!-- Indicadores Rápidos y Botón Cargar Demo -->
-      <div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
+      <!-- Indicadores Rápidos, Botón Amigos y Cargar Demo -->
+      <div class="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+        <!-- Indicador de Mi Caja -->
         <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/80 text-xs">
           <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span class="text-slate-400 hidden xs:inline sm:inline">Caja:</span>
+          <span class="text-slate-400 hidden xs:inline sm:inline">Míos:</span>
           <strong id="header-box-count" class="font-mono text-cyan-300 text-xs sm:text-sm">0</strong>
         </div>
 
+        <!-- Botón Administrar Amigos Fijos -->
+        <button
+          id="btn-add-friend-trigger"
+          type="button"
+          class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-950/80 hover:bg-indigo-900/90 text-indigo-300 border border-indigo-500/40 shadow-sm transition flex items-center gap-1"
+          title="Crear y gestionar amigos fijos"
+        >
+          <span>👥</span>
+          <span class="hidden sm:inline">Gestionar</span>
+          <span>Amigos</span>
+        </button>
+
+        <!-- Botón Demo -->
         <button
           id="btn-load-demo-box"
           type="button"
           class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-pink-600/85 to-purple-600/85 hover:from-pink-500 hover:to-purple-500 active:scale-95 text-white border border-pink-400/40 shadow-md shadow-pink-500/10 transition flex items-center gap-1"
-          title="Carga un equipo de prueba con Eternatus, Duraludon Gigamax, Groudon Primigenio, Excadrill Dinamax y más"
+          title="Carga una caja de prueba completa para ti y tus amigos"
         >
           <span>⚡</span>
-          <span class="hidden sm:inline">Cargar Caja</span>
           <span>Demo</span>
         </button>
       </div>
     </div>
 
-    <!-- Barra de Navegación Superior (Visible en Tablet/Desktop y deslizable en móvil) -->
+    <!-- Barra de Navegación Superior Desktop -->
     <div class="hidden sm:flex max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 gap-2 overflow-x-auto border-t border-slate-800/60 pt-2">
       <button
         type="button"
@@ -102,7 +115,7 @@
         class="nav-tab-btn active-tab px-4 py-2.5 rounded-t-xl text-xs sm:text-sm font-bold tracking-wide flex items-center gap-2 border-b-2 border-pink-500 bg-slate-900/90 text-white transition whitespace-nowrap"
       >
         <span>⚔️</span>
-        <span>Optimizador de Jefe &amp; Calculadora</span>
+        <span>Optimizador de Combate &amp; Calculadora</span>
       </button>
 
       <button
@@ -111,7 +124,7 @@
         class="nav-tab-btn px-4 py-2.5 rounded-t-xl text-xs sm:text-sm font-semibold tracking-wide flex items-center gap-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/50 transition whitespace-nowrap"
       >
         <span>📦</span>
-        <span>Mi Caja Pokémon</span>
+        <span>Caja de Pokémon (Tú y Amigos)</span>
         <span id="tab-box-badge" class="px-1.5 py-0.2 rounded-full text-[11px] font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">0</span>
       </button>
 
@@ -138,7 +151,7 @@
       
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 items-start">
 
-        <!-- COLUMNA IZQUIERDA (5 cols): SELECTOR DE JEFE CON LUPA Y CONDICIONES (MÓDULO 2) -->
+        <!-- COLUMNA IZQUIERDA (5 cols): SELECTOR DE JEFE, AMIGOS FIJOS Y CONDICIONES -->
         <div class="lg:col-span-5 space-y-4 sm:space-y-5">
           
           <!-- Tarjeta de Selección de Combate y Jefe -->
@@ -162,9 +175,7 @@
                 <select
                   id="select-battle-mode"
                   class="w-full min-h-[44px] rounded-xl bg-slate-950/90 border border-slate-700/80 px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition"
-                >
-                  <!-- Se puebla dinámicamente desde POKE_DB.battleModes -->
-                </select>
+                ></select>
                 <p id="battle-mode-desc" class="mt-1.5 text-xs text-slate-400 leading-relaxed">
                   Selecciona el nivel de incursión o combate Dinamax/Gigamax.
                 </p>
@@ -174,10 +185,9 @@
               <div class="relative">
                 <label for="input-boss-search" class="block text-xs font-semibold uppercase tracking-wider text-cyan-300 mb-1.5 flex items-center justify-between">
                   <span>🔍 Buscar Jefe a Enfrentar</span>
-                  <span class="text-[10px] font-mono text-slate-400 normal-case">Nombre, #Dex o Tipo</span>
+                  <span class="text-[10px] font-mono text-slate-400 normal-case">Nombre o tipo</span>
                 </label>
 
-                <!-- Input con icono de Lupa y botón X -->
                 <div class="relative flex items-center">
                   <svg class="w-5 h-5 text-cyan-400 absolute left-3.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 103.5 10.5a7.5 7.5 0 0013.15 6.15z"></path>
@@ -199,21 +209,16 @@
                   </button>
                 </div>
 
-                <!-- Lista Desplegable de Sugerencias Instantáneas del Jefe -->
                 <div
                   id="boss-search-dropdown"
                   class="hidden absolute left-0 right-0 z-30 mt-1.5 max-h-64 overflow-y-auto rounded-xl bg-slate-950/98 border border-cyan-500/50 shadow-2xl divide-y divide-slate-800/80"
                 ></div>
 
-                <!-- Accesos Rápidos Táctiles de Jefes Destacados -->
-                <div id="boss-quick-chips" class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-2 pb-0.5">
-                  <!-- Se puebla en js/app.js con chips táctiles (Eternatus, Duraludon G-Max, Groudon, etc.) -->
-                </div>
+                <div id="boss-quick-chips" class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-2 pb-0.5"></div>
 
-                <!-- Selector nativo sincronizado -->
                 <div class="mt-2">
                   <label for="select-boss-pokemon" class="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-                    Jefe Seleccionado Actualmente
+                    Jefe Seleccionado
                   </label>
                   <select
                     id="select-boss-pokemon"
@@ -244,7 +249,7 @@
                 </div>
               </div>
 
-              <!-- Resumen del Jefe Seleccionado (Tipos, Debilidades, PS, Reloj) -->
+              <!-- Resumen del Jefe Seleccionado -->
               <div id="boss-summary-card" class="mt-2 p-3.5 sm:p-4 rounded-xl bg-slate-950/90 border border-slate-800/90 space-y-3">
                 <div class="flex items-center justify-between gap-2">
                   <div>
@@ -254,7 +259,6 @@
                   <div id="boss-types-badges" class="flex flex-wrap items-center justify-end gap-1.5"></div>
                 </div>
 
-                <!-- Estadísticas del Jefe en este Modo -->
                 <div class="grid grid-cols-3 gap-2 text-center bg-slate-900/90 rounded-lg p-2 border border-slate-800/70">
                   <div>
                     <span class="block text-[10px] uppercase text-slate-400">PS Jefe</span>
@@ -270,7 +274,6 @@
                   </div>
                 </div>
 
-                <!-- Debilidades x2.56 y x1.6 -->
                 <div>
                   <span class="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
                     Debilidades Elementales (Multiplicador PoGO):
@@ -278,6 +281,22 @@
                   <div id="boss-weaknesses-list" class="flex flex-wrap gap-1.5"></div>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <!-- SELECCIONAR AMIGOS FIJOS PARA ESTE COMBATE -->
+          <div class="bg-slate-900/90 backdrop-blur-md border border-indigo-500/30 rounded-2xl p-4 sm:p-5 shadow-xl space-y-3">
+            <div class="flex items-center justify-between">
+              <h2 class="font-display text-xs sm:text-base font-bold uppercase tracking-wider text-indigo-300 flex items-center gap-2">
+                <span>👥 Amigos que van contigo</span>
+              </h2>
+              <span class="text-[11px] text-slate-400">Marca los que participen</span>
+            </div>
+            <p class="text-xs text-slate-400 leading-relaxed">
+              El simulador sumará los Pokémon reales que guardaste en el equipo de cada amigo.
+            </p>
+            <div id="combat-friends-container" class="space-y-2">
+              <!-- Se puebla dinámicamente con los amigos registrados -->
             </div>
           </div>
 
@@ -296,7 +315,7 @@
                     <span>⚡ Juego en Equipo (Party Power)</span>
                   </label>
                   <p class="text-[11px] text-slate-400">
-                    Duplica (x2.0) el daño de tus ataques cargados según miembros en la Party.
+                    Duplica (x2.0) el daño de ataques cargados.
                   </p>
                 </div>
                 <input
@@ -328,7 +347,7 @@
             <!-- Nivel de Amistad -->
             <div>
               <label for="select-friendship" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
-                Nivel de Amistad en el Lobby
+                Nivel de Amistad
               </label>
               <select
                 id="select-friendship"
@@ -342,29 +361,29 @@
               </select>
             </div>
 
-            <!-- Bono de Mega Activa en el Grupo -->
+            <!-- Bono Mega -->
             <div>
               <label for="select-mega-bonus" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
-                Bono de Megaevolución / Primigenio Aliado
+                Bono de Megaevolución Aliada
               </label>
               <select
                 id="select-mega-bonus"
                 class="w-full min-h-[44px] rounded-xl bg-slate-950 border border-slate-700/80 px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-400"
               >
                 <option value="none" selected>Sin Mega aliada activa (0%)</option>
-                <option value="diff">Mega activa en el grupo (+10% daño general)</option>
-                <option value="same">Mega / Primigenio del mismo tipo (+30% daño)</option>
+                <option value="diff">Mega activa otro tipo (+10%)</option>
+                <option value="same">Mega del mismo tipo (+30%)</option>
               </select>
             </div>
 
-            <!-- Clima a Favor -->
+            <!-- Clima -->
             <div class="flex items-center justify-between gap-3 p-3.5 rounded-xl bg-slate-950/80 border border-slate-800">
               <div>
                 <label for="toggle-weather-boost" class="text-sm font-semibold text-slate-200 cursor-pointer">
                   ☀️ Clima a Favor (+20% Daño)
                 </label>
                 <p class="text-[11px] text-slate-400">
-                  Aplica el multiplicador climático x1.20 a tus ataques eficaces.
+                  Potencia tus ataques eficaces con el bono del tiempo atmosférico.
                 </p>
               </div>
               <input
@@ -374,7 +393,6 @@
               />
             </div>
 
-            <!-- Botón Recalcular -->
             <button
               id="btn-run-optimizer"
               type="button"
@@ -386,7 +404,7 @@
 
         </div>
 
-        <!-- COLUMNA DERECHA (7 cols): RESULTADOS DEL MOTOR Y JUGADORES (MÓDULO 3) -->
+        <!-- COLUMNA DERECHA (7 cols): RESULTADOS CLAROS Y DIAGNÓSTICO -->
         <div class="lg:col-span-7 space-y-5 sm:space-y-6">
 
           <!-- Panel Resumen de Veredicto Directo y Contribución Personal -->
@@ -397,21 +415,20 @@
                   Diagnóstico Táctico en Tiempo Real
                 </span>
                 <h2 class="font-display text-base sm:text-xl font-extrabold text-white mt-0.5">
-                  Tu Aporte de Daño &amp; Escenarios
+                  Tu Aporte de Daño &amp; Escenarios de Victoria
                 </h2>
               </div>
 
-              <!-- Badge de Estado Solable / Necesita Grupo -->
               <div id="verdict-badge" class="px-3 py-1.5 rounded-xl font-mono text-[11px] sm:text-xs font-bold uppercase tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
-                Analizando Caja...
+                Analizando...
               </div>
             </div>
 
-            <!-- Barra de Contribución Personal de Daño (% de la Vida del Jefe) -->
+            <!-- Barra de Contribución Personal/Grupo -->
             <div class="mt-4 sm:mt-5 space-y-2">
               <div class="flex flex-wrap items-baseline justify-between gap-1">
                 <span class="text-xs sm:text-sm font-semibold text-slate-300">
-                  Vida del Jefe que bajas tú solo:
+                  Vida del Jefe cubierta por tu grupo:
                 </span>
                 <div class="flex items-baseline gap-2">
                   <strong id="personal-damage-pct" class="font-mono text-2xl sm:text-3xl font-extrabold text-cyan-300">0.0%</strong>
@@ -419,7 +436,6 @@
                 </div>
               </div>
 
-              <!-- Barra de progreso visual -->
               <div class="w-full h-4 rounded-full bg-slate-950 border border-slate-800 overflow-hidden p-0.5">
                 <div
                   id="personal-damage-bar"
@@ -428,7 +444,7 @@
                 ></div>
               </div>
 
-              <!-- Métricas Técnicas: DPS del Equipo, TDO Total y Multiplicador Global -->
+              <!-- Métricas Técnicas -->
               <div class="grid grid-cols-3 gap-2 sm:gap-3 pt-2">
                 <div class="p-2.5 sm:p-3 rounded-xl bg-slate-950/80 border border-slate-800/80 text-center sm:text-left">
                   <span class="block text-[10px] sm:text-[11px] uppercase text-slate-400">Tu DPS</span>
@@ -445,67 +461,81 @@
               </div>
             </div>
 
-            <!-- Frase Directa de Recomendación (Requisito clave Módulo 3) -->
+            <!-- Frase Directa de Recomendación -->
             <div class="mt-4 sm:mt-5 p-3.5 sm:p-4 rounded-xl bg-gradient-to-r from-slate-950 via-indigo-950/60 to-slate-950 border border-indigo-500/40">
               <p id="direct-recommendation-text" class="text-xs sm:text-base text-slate-100 leading-relaxed font-medium">
                 Cargando el motor matemático...
               </p>
             </div>
 
-            <!-- Desglose Visual de Jugadores Necesarios en 3 Escenarios -->
+            <!-- Desglose de aporte de Amigos Fijos Seleccionados -->
+            <div id="friends-contribution-summary" class="mt-4 hidden"></div>
+
+            <!-- TABLA ULTRA-CLARA DE COMPAÑEROS NECESARIOS -->
             <div class="mt-4 sm:mt-5">
-              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2.5">
-                Compañeros Adicionales Según su Preparación:
-              </h3>
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300">
+                  🎯 ¿Cuántos Compañeros Extras Necesitas para Ganar?
+                </h3>
+              </div>
 
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
                 <!-- Escenario 1: Hardcore -->
-                <div class="p-3.5 sm:p-4 rounded-xl bg-emerald-950/30 border border-emerald-500/40 flex sm:flex-col items-center sm:items-stretch justify-between gap-2">
+                <div class="p-3.5 rounded-xl bg-emerald-950/30 border border-emerald-500/40 flex flex-col justify-between">
                   <div>
-                    <div class="flex items-center gap-2 sm:justify-between">
+                    <div class="flex items-center justify-between">
                       <span class="text-xs font-bold uppercase tracking-wider text-emerald-300">🔥 Hardcore</span>
-                      <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">Nv. 40-50</span>
+                      <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">Meta Nv. 40-50</span>
                     </div>
-                    <p class="text-[11px] text-slate-400 mt-1">
-                      Pokémon meta optimizados, ataques correctos y Party Power / Max Nv. 3.
+                    <p class="text-[11px] text-slate-400 mt-1 leading-snug">
+                      Jugadores con counters meta maxeados y usando Party Power o Max Nv. 3.
                     </p>
                   </div>
-                  <div class="sm:mt-3 sm:pt-2.5 sm:border-t border-emerald-500/20 flex flex-col sm:flex-row items-end sm:items-baseline justify-between shrink-0">
-                    <span class="text-[11px] text-slate-400 hidden sm:inline">Necesitas:</span>
+                  <div class="mt-3 pt-2.5 border-t border-emerald-500/20 flex items-baseline justify-between">
+                    <div>
+                      <span class="text-[11px] text-slate-400 block">Compañeros:</span>
+                      <span id="scenario-hardcore-pct" class="text-[10px] text-emerald-400 font-mono block">Bajan ~35% c/u</span>
+                    </div>
                     <strong id="scenario-hardcore-count" class="font-display text-lg sm:text-xl font-extrabold text-emerald-300">+0</strong>
                   </div>
                 </div>
 
                 <!-- Escenario 2: Estándar -->
-                <div class="p-3.5 sm:p-4 rounded-xl bg-cyan-950/30 border border-cyan-500/40 flex sm:flex-col items-center sm:items-stretch justify-between gap-2">
+                <div class="p-3.5 rounded-xl bg-cyan-950/30 border border-cyan-500/40 flex flex-col justify-between">
                   <div>
-                    <div class="flex items-center gap-2 sm:justify-between">
+                    <div class="flex items-center justify-between">
                       <span class="text-xs font-bold uppercase tracking-wider text-cyan-300">⚡ Estándar</span>
                       <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300">Nv. 30-35</span>
                     </div>
-                    <p class="text-[11px] text-slate-400 mt-1">
-                      Preparación media, buenos counters sin caramelos XL y ataques eficaces.
+                    <p class="text-[11px] text-slate-400 mt-1 leading-snug">
+                      Jugadores con buenos counters sin caramelos XL y ataques correctos.
                     </p>
                   </div>
-                  <div class="sm:mt-3 sm:pt-2.5 sm:border-t border-cyan-500/20 flex flex-col sm:flex-row items-end sm:items-baseline justify-between shrink-0">
-                    <span class="text-[11px] text-slate-400 hidden sm:inline">Necesitas:</span>
+                  <div class="mt-3 pt-2.5 border-t border-cyan-500/20 flex items-baseline justify-between">
+                    <div>
+                      <span class="text-[11px] text-slate-400 block">Compañeros:</span>
+                      <span id="scenario-standard-pct" class="text-[10px] text-cyan-400 font-mono block">Bajan ~20% c/u</span>
+                    </div>
                     <strong id="scenario-standard-count" class="font-display text-lg sm:text-xl font-extrabold text-cyan-300">+0</strong>
                   </div>
                 </div>
 
                 <!-- Escenario 3: Casual -->
-                <div class="p-3.5 sm:p-4 rounded-xl bg-amber-950/30 border border-amber-500/40 flex sm:flex-col items-center sm:items-stretch justify-between gap-2">
+                <div class="p-3.5 rounded-xl bg-amber-950/30 border border-amber-500/40 flex flex-col justify-between">
                   <div>
-                    <div class="flex items-center gap-2 sm:justify-between">
+                    <div class="flex items-center justify-between">
                       <span class="text-xs font-bold uppercase tracking-wider text-amber-300">🛡️ Casual</span>
-                      <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">Nv. 20-25</span>
+                      <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">Nv. 20-25 Auto</span>
                     </div>
-                    <p class="text-[11px] text-slate-400 mt-1">
-                      Equipos recomendados automáticamente por el juego y sin potenciar.
+                    <p class="text-[11px] text-slate-400 mt-1 leading-snug">
+                      Jugadores con los Pokémon recomendados por el juego sin optimizar.
                     </p>
                   </div>
-                  <div class="sm:mt-3 sm:pt-2.5 sm:border-t border-amber-500/20 flex flex-col sm:flex-row items-end sm:items-baseline justify-between shrink-0">
-                    <span class="text-[11px] text-slate-400 hidden sm:inline">Necesitas:</span>
+                  <div class="mt-3 pt-2.5 border-t border-amber-500/20 flex items-baseline justify-between">
+                    <div>
+                      <span class="text-[11px] text-slate-400 block">Compañeros:</span>
+                      <span id="scenario-casual-pct" class="text-[10px] text-amber-400 font-mono block">Bajan ~10% c/u</span>
+                    </div>
                     <strong id="scenario-casual-count" class="font-display text-lg sm:text-xl font-extrabold text-amber-300">+0</strong>
                   </div>
                 </div>
@@ -522,26 +552,24 @@
                   <span id="recommended-team-title">Tu Equipo Ideal Recomendado (Top 6 Incursión)</span>
                 </h2>
                 <p id="recommended-team-subtitle" class="text-xs text-slate-400 mt-0.5">
-                  Seleccionados automáticamente de "Mi Caja Pokémon" según DPS, eficacia de tipos y supervivencia.
+                  Seleccionados automáticamente de tu colección personal.
                 </p>
               </div>
             </div>
 
-            <!-- Banner Explicativo de Estrategia Max (visible solo en Combates Dinamax / Gigamax) -->
+            <!-- Banner Explicativo de Estrategia Max -->
             <div id="max-strategy-banner" class="hidden p-3.5 rounded-xl bg-pink-950/40 border border-pink-500/40 text-xs text-pink-100 space-y-1">
               <div class="font-bold text-pink-300 uppercase tracking-wider flex items-center gap-1.5">
                 <span>🌀 Estrategia de Patrulla Dinamax / Gigamax (3 Pokémon):</span>
               </div>
               <p class="text-slate-300">
-                <strong>Slots 1 y 2 (Tanques / Generadores de Medidor Max):</strong> Usa Pokémon resistentes con ataques rápidos de 0.5s para llenar el medidor rápido sin caer.
-                <strong>Slot 3 (Atacante Fase Max):</strong> Cámbialo justo al iniciar la cuenta atrás Dinamax/Gigamax para desatar sus 3 Ataques Max al máximo nivel.
+                <strong>Slots 1 y 2 (Tanques / Generadores de Medidor):</strong> Con ataques rápidos de 0.5s para cargar rápido el medidor Max.
+                <strong>Slot 3 (Atacante Fase Max):</strong> Cámbialo al empezar la cuenta atrás Max para conectar sus 3 Ataques Max de máxima potencia.
               </p>
             </div>
 
             <!-- Grid de Tarjetas del Equipo Recomendado -->
-            <div id="recommended-team-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              <!-- Se renderiza dinámicamente -->
-            </div>
+            <div id="recommended-team-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3.5"></div>
           </div>
 
         </div>
@@ -550,16 +578,16 @@
     </section>
 
     <!-- ======================================================================
-         VISTA 2: MI CAJA POKÉMON (MÓDULO 1 - CRUD CON LOCALSTORAGE Y BUSCADORES LUPA)
+         VISTA 2: CAJA POKÉMON (TÚ Y TUS AMIGOS)
          ====================================================================== -->
     <section id="tab-box" class="tab-panel hidden space-y-6">
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 items-start">
 
-        <!-- FORMULARIO PARA AÑADIR / EDITAR POKÉMON CON BUSCADOR DE LUPA (5 cols) -->
+        <!-- FORMULARIO PARA AÑADIR / EDITAR POKÉMON (CON PLANTILLAS RÁPIDAS 1-TAP) -->
         <div class="lg:col-span-5 bg-slate-900/95 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-2xl space-y-4">
           <div class="flex items-center justify-between border-b border-slate-800 pb-3">
             <h2 id="box-form-title" class="font-display text-sm sm:text-base font-extrabold text-cyan-300 uppercase tracking-wider">
-              ➕ Añadir Pokémon a Mi Caja
+              ➕ Añadir Pokémon a la Caja
             </h2>
             <button
               id="btn-cancel-edit"
@@ -573,11 +601,24 @@
           <form id="pokemon-box-form" class="space-y-4">
             <input type="hidden" id="form-pokemon-uid" value="" />
 
-            <!-- BUSCADOR CON LUPA Y AUTOCOMPLETADO DE ESPECIE -->
+            <!-- DUEÑO DEL POKÉMON (YO O AMIGO FIJO) -->
+            <div class="p-3 rounded-xl bg-slate-950/90 border border-indigo-500/40">
+              <label for="select-form-owner" class="block text-xs font-bold uppercase tracking-wider text-indigo-300 mb-1">
+                ¿De quién es este Pokémon?
+              </label>
+              <select
+                id="select-form-owner"
+                class="w-full min-h-[42px] rounded-xl bg-slate-900 border border-indigo-500/50 px-3 py-2 text-xs sm:text-sm font-semibold text-white focus:outline-none focus:border-cyan-400"
+              >
+                <!-- Se puebla dinámicamente con Yo y Amigos -->
+              </select>
+            </div>
+
+            <!-- BUSCADOR CON LUPA DE ESPECIE -->
             <div class="relative">
               <label for="input-species-search" class="block text-xs font-semibold uppercase tracking-wider text-cyan-300 mb-1.5 flex items-center justify-between">
-                <span>🔍 Buscar Especie de Pokémon</span>
-                <span class="text-[10px] font-mono text-slate-400 normal-case">Escribe nombre, #Dex o tipo</span>
+                <span>🔍 Buscar Especie</span>
+                <span class="text-[10px] font-mono text-slate-400 normal-case">Escribe nombre o tipo</span>
               </label>
 
               <div class="relative flex items-center">
@@ -588,20 +629,19 @@
                   id="input-species-search"
                   type="search"
                   autocomplete="off"
-                  placeholder="Escribe ej: Eternatus, Duraludon, Excadrill..."
+                  placeholder="Ej: Eternatus, Duraludon, Excadrill..."
                   class="w-full min-h-[44px] rounded-xl bg-slate-950 border border-cyan-500/40 pl-10 pr-9 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30 transition"
                 />
                 <button
                   id="btn-clear-species-search"
                   type="button"
                   class="hidden absolute right-2.5 w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center text-xs font-bold"
-                  title="Limpiar búsqueda"
+                  title="Limpiar"
                 >
                   ✕
                 </button>
               </div>
 
-              <!-- Desplegable de Sugerencias Táctiles al Escribir -->
               <div
                 id="species-search-dropdown"
                 class="hidden absolute left-0 right-0 z-30 mt-1.5 max-h-64 overflow-y-auto rounded-xl bg-slate-950/98 border border-cyan-500/50 shadow-2xl divide-y divide-slate-800/80"
@@ -619,7 +659,40 @@
               </div>
             </div>
 
-            <!-- Mote / Nombre Personalizado -->
+            <!-- PLANTILLAS RÁPIDAS 1-TAP (MÁXIMA COMODIDAD AL GUARDAR) -->
+            <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+              <span class="text-xs font-bold uppercase tracking-wider text-amber-300 block">
+                ⚡ Plantillas Rápidas (Configura en 1 Toque):
+              </span>
+              <div class="grid grid-cols-3 gap-1.5">
+                <button
+                  type="button"
+                  data-quick-preset="hundo_50"
+                  class="p-2 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-center active:scale-95 transition"
+                >
+                  <span class="block text-[10px] uppercase font-bold text-amber-300">⭐ 100% Nv. 50</span>
+                  <span class="text-[9px] text-slate-400">15/15/15 Máx</span>
+                </button>
+                <button
+                  type="button"
+                  data-quick-preset="raid_40"
+                  class="p-2 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-center active:scale-95 transition"
+                >
+                  <span class="block text-[10px] uppercase font-bold text-cyan-300">⚔️ Raid Nv. 40</span>
+                  <span class="text-[9px] text-slate-400">15/14/14 Sin XL</span>
+                </button>
+                <button
+                  type="button"
+                  data-quick-preset="caught_20"
+                  class="p-2 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-center active:scale-95 transition"
+                >
+                  <span class="block text-[10px] uppercase font-bold text-emerald-300">🌱 Atrapado 20</span>
+                  <span class="text-[9px] text-slate-400">Recién capturado</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Mote -->
             <div>
               <label for="input-box-nickname" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
                 Mote / Etiqueta (Opcional)
@@ -632,19 +705,18 @@
               />
             </div>
 
-            <!-- IVs: Ataque, Defensa y PS (0 a 15) -->
+            <!-- IVs: Ataque, Defensa y PS -->
             <div class="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800 space-y-3">
               <div class="flex items-center justify-between">
                 <span class="text-xs font-bold uppercase tracking-wider text-slate-300">IVs Individuales (0 - 15)</span>
                 <div class="flex items-center gap-2">
-                  <button type="button" id="btn-iv-hundo" class="text-[11px] font-mono px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 active:scale-95">
-                    15/15/15 (100%)
+                  <button type="button" data-quick-preset="hundo_only" class="text-[11px] font-mono px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 active:scale-95">
+                    15/15/15
                   </button>
                   <span id="iv-percentage-badge" class="text-xs font-mono font-bold text-cyan-300">100%</span>
                 </div>
               </div>
 
-              <!-- Ataque IV -->
               <div>
                 <div class="flex justify-between text-xs mb-1.5">
                   <span class="text-slate-400">⚔️ IV Ataque</span>
@@ -653,7 +725,6 @@
                 <input id="input-iv-atk" type="range" min="0" max="15" value="15" class="iv-slider w-full" />
               </div>
 
-              <!-- Defensa IV -->
               <div>
                 <div class="flex justify-between text-xs mb-1.5">
                   <span class="text-slate-400">🛡️ IV Defensa</span>
@@ -662,17 +733,16 @@
                 <input id="input-iv-def" type="range" min="0" max="15" value="15" class="iv-slider w-full" />
               </div>
 
-              <!-- PS IV -->
               <div>
                 <div class="flex justify-between text-xs mb-1.5">
-                  <span class="text-slate-400">❤️ IV PS (Stamina)</span>
+                  <span class="text-slate-400">❤️ IV PS</span>
                   <strong id="label-iv-sta" class="font-mono text-emerald-400 text-sm">15</strong>
                 </div>
                 <input id="input-iv-sta" type="range" min="0" max="15" value="15" class="iv-slider w-full" />
               </div>
             </div>
 
-            <!-- Estado de Mejora / Nivel Aproximado o Cálculo mediante PC -->
+            <!-- Nivel / PC -->
             <div class="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800 space-y-3">
               <div class="flex items-center justify-between">
                 <label for="select-level-preset" class="text-xs font-bold uppercase tracking-wider text-slate-300">
@@ -686,13 +756,11 @@
               <select
                 id="select-level-preset"
                 class="w-full min-h-[44px] rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-xs sm:text-sm text-white focus:outline-none focus:border-cyan-400"
-              >
-                <!-- Se puebla desde POKE_DB.levelPresets -->
-              </select>
+              ></select>
 
               <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-3">
                 <label for="input-custom-cp" class="text-[11px] text-slate-400 leading-snug">
-                  ¿Prefieres poner sus <strong>PC exactos</strong> para calcular el nivel solo?
+                  O pon sus <strong>PC exactos</strong>:
                 </label>
                 <input
                   id="input-custom-cp"
@@ -700,13 +768,13 @@
                   inputmode="numeric"
                   min="10"
                   max="7000"
-                  placeholder="PC opcional"
+                  placeholder="PC"
                   class="w-28 min-h-[40px] rounded-lg bg-slate-900 border border-slate-700 px-2.5 py-1.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 shrink-0"
                 />
               </div>
             </div>
 
-            <!-- Movimientos Rápido y Cargado -->
+            <!-- Movimientos -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label for="select-box-fast" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
@@ -728,17 +796,14 @@
               </div>
             </div>
 
-            <!-- Opciones Adicionales: Oscuro (Shadow) y Dinamax / Gigamax -->
+            <!-- Opciones Adicionales -->
             <div class="space-y-3 pt-1">
-              <!-- Toggle Oscuro -->
               <div class="flex items-center justify-between gap-3 p-3.5 rounded-xl bg-purple-950/30 border border-purple-500/40">
                 <div>
                   <label for="toggle-box-shadow" class="text-xs sm:text-sm font-bold text-purple-300 cursor-pointer flex items-center gap-1.5">
                     <span>🟣 ¿Es Pokémon Oscuro (Shadow)?</span>
                   </label>
-                  <p class="text-[11px] text-slate-400">
-                    +20% Bono de Ataque (x1.20) en combate.
-                  </p>
+                  <p class="text-[11px] text-slate-400">+20% Ataque en combate.</p>
                 </div>
                 <input
                   id="toggle-box-shadow"
@@ -747,7 +812,6 @@
                 />
               </div>
 
-              <!-- Configuración Dinamax / Gigamax -->
               <div class="p-3.5 rounded-xl bg-pink-950/30 border border-pink-500/40 space-y-3">
                 <div class="flex flex-wrap items-center justify-between gap-2">
                   <label for="select-box-max-class" class="text-xs sm:text-sm font-bold text-pink-300">
@@ -764,7 +828,6 @@
                   </select>
                 </div>
 
-                <!-- Niveles de Movimientos Max (Ataque, Guardia, Espíritu) -->
                 <div id="max-moves-levels-panel" class="hidden grid grid-cols-3 gap-2 pt-2 border-t border-pink-500/20">
                   <div>
                     <label for="select-max-atk-lv" class="block text-[10px] font-bold uppercase text-pink-300 mb-1">
@@ -773,69 +836,78 @@
                     <select id="select-max-atk-lv" class="w-full min-h-[38px] rounded-lg bg-slate-950 border border-slate-700 px-2 py-1.5 text-xs text-white">
                       <option value="1">Nivel 1</option>
                       <option value="2">Nivel 2</option>
-                      <option value="3" selected>Nivel 3 (Máx)</option>
+                      <option value="3" selected>Nivel 3</option>
                     </select>
                   </div>
                   <div>
                     <label for="select-max-guard-lv" class="block text-[10px] font-bold uppercase text-cyan-300 mb-1">
-                      🛡️ Guardia Max
+                      🛡️ Guardia
                     </label>
                     <select id="select-max-guard-lv" class="w-full min-h-[38px] rounded-lg bg-slate-950 border border-slate-700 px-2 py-1.5 text-xs text-white">
-                      <option value="0">Bloqueado</option>
-                      <option value="1">Nivel 1</option>
-                      <option value="2">Nivel 2</option>
-                      <option value="3">Nivel 3 (Máx)</option>
+                      <option value="0">0</option>
+                      <option value="1">1</option>
+                      <option value="2">2</option>
+                      <option value="3">3</option>
                     </select>
                   </div>
                   <div>
                     <label for="select-max-spirit-lv" class="block text-[10px] font-bold uppercase text-emerald-300 mb-1">
-                      ❤️ Espíritu Max
+                      ❤️ Espíritu
                     </label>
                     <select id="select-max-spirit-lv" class="w-full min-h-[38px] rounded-lg bg-slate-950 border border-slate-700 px-2 py-1.5 text-xs text-white">
-                      <option value="0">Bloqueado</option>
-                      <option value="1">Nivel 1</option>
-                      <option value="2">Nivel 2</option>
-                      <option value="3">Nivel 3 (Máx)</option>
+                      <option value="0">0</option>
+                      <option value="1">1</option>
+                      <option value="2">2</option>
+                      <option value="3">3</option>
                     </select>
                   </div>
                 </div>
               </div>
             </div>
 
-            <!-- Botón Guardar en Mi Caja -->
             <button
               id="btn-save-pokemon"
               type="submit"
               class="w-full min-h-[48px] py-3 px-4 rounded-xl font-display font-bold text-xs sm:text-sm uppercase tracking-wider bg-gradient-to-r from-emerald-500 to-cyan-600 hover:from-emerald-400 hover:to-cyan-500 text-white shadow-lg shadow-cyan-500/20 transition active:scale-[0.98]"
             >
-              💾 Guardar en Mi Caja Pokémon
+              💾 Guardar Pokémon
             </button>
           </form>
         </div>
 
-        <!-- COLECCIÓN DE TARJETAS DE MI CAJA POKÉMON CON BUSCADOR DE LUPA (7 cols) -->
+        <!-- COLECCIÓN DE TARJETAS (FILTRABLE POR MI CAJA O AMIGO) -->
         <div class="lg:col-span-7 space-y-4">
           <div class="bg-slate-900/95 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl space-y-3.5">
             <div class="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h2 class="font-display text-sm sm:text-lg font-extrabold text-white">
-                  📦 Mi Colección Personal Guardada
+                  📦 Colección Guardada
                 </h2>
                 <p class="text-xs text-slate-400">
-                  Guardada en tu dispositivo (<code class="text-cyan-300">localStorage</code>).
+                  Visualiza tus Pokémon y los equipos de tus amigos.
                 </p>
               </div>
 
-              <button
-                id="btn-clear-box"
-                type="button"
-                class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 border border-rose-500/40 transition"
-              >
-                🗑️ Vaciar Caja
-              </button>
+              <!-- Selector de Vista: Mío / Amigo / Todos -->
+              <div class="flex items-center gap-2">
+                <select
+                  id="select-box-owner-filter"
+                  class="min-h-[38px] rounded-xl bg-slate-950 border border-indigo-500/40 px-3 py-1.5 text-xs font-bold text-indigo-300 focus:outline-none"
+                >
+                  <!-- Se puebla dinámicamente -->
+                </select>
+                <button
+                  id="btn-clear-box"
+                  type="button"
+                  class="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 border border-rose-500/40 transition"
+                  title="Vaciar vista actual"
+                >
+                  🗑️
+                </button>
+              </div>
             </div>
 
-            <!-- BUSCADOR CON LUPA EN MI CAJA POKÉMON -->
+            <!-- Buscador con Lupa en la Colección -->
             <div class="relative flex items-center">
               <svg class="w-5 h-5 text-cyan-400 absolute left-3.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 103.5 10.5a7.5 7.5 0 0013.15 6.15z"></path>
@@ -844,26 +916,26 @@
                 id="input-filter-box"
                 type="search"
                 autocomplete="off"
-                placeholder="Buscar en mi caja por Pokémon, mote, tipo o movimiento..."
+                placeholder="Buscar por Pokémon, amigo, mote, tipo o ataque..."
                 class="w-full min-h-[44px] rounded-xl bg-slate-950 border border-slate-700 pl-10 pr-9 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30 transition"
               />
               <button
                 id="btn-clear-box-filter"
                 type="button"
                 class="hidden absolute right-2.5 w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center text-xs font-bold"
-                title="Limpiar filtro"
+                title="Limpiar"
               >
                 ✕
               </button>
             </div>
 
-            <!-- Filtros Rápidos por Categoría en Mi Caja -->
+            <!-- Filtros Rápidos -->
             <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-0.5">
               <button type="button" data-box-tag="all" class="box-tag-btn px-3 py-1 rounded-full text-xs font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0">
                 Todos
               </button>
               <button type="button" data-box-tag="max" class="box-tag-btn px-3 py-1 rounded-full text-xs font-semibold bg-slate-950 text-slate-400 border border-slate-800 hover:text-pink-300 shrink-0">
-                🌀 Dinamax / Gigamax
+                🌀 Max
               </button>
               <button type="button" data-box-tag="shadow" class="box-tag-btn px-3 py-1 rounded-full text-xs font-semibold bg-slate-950 text-slate-400 border border-slate-800 hover:text-purple-300 shrink-0">
                 🟣 Oscuros
@@ -874,17 +946,14 @@
             </div>
           </div>
 
-          <!-- Grid de Tarjetas de Mi Caja -->
-          <div id="my-box-cards-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
-            <!-- Se renderiza dinámicamente desde localStorage -->
-          </div>
+          <div id="my-box-cards-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4"></div>
         </div>
 
       </div>
     </section>
 
     <!-- ======================================================================
-         VISTA 3: BASE DE DATOS META, ETERNATUS Y GIGAMAX CON BUSCADOR DE LUPA
+         VISTA 3: BASE DE DATOS META
          ====================================================================== -->
     <section id="tab-pokedex" class="tab-panel hidden space-y-5">
       <div class="bg-slate-900/95 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-2xl space-y-4">
@@ -894,7 +963,7 @@
               🧬 Base de Datos Meta &amp; Gigamax
             </h2>
             <p class="text-xs text-slate-400 mt-0.5">
-              Eternatus (Cañón Dinamax), Duraludon Gigamax, Iniciales Galar/Kanto Gigamax, Primigenios y Megas.
+              Eternatus, Duraludon Gigamax, Iniciales Galar/Kanto Gigamax, Primigenios y Megas.
             </p>
           </div>
           <span id="db-total-species-badge" class="px-3 py-1 rounded-xl font-mono text-xs font-bold bg-pink-500/20 text-pink-300 border border-pink-500/40">
@@ -902,7 +971,6 @@
           </span>
         </div>
 
-        <!-- BUSCADOR CON LUPA EN LA POKÉDEX / BASE DE DATOS META -->
         <div class="space-y-3">
           <div class="relative flex items-center">
             <svg class="w-5 h-5 text-pink-400 absolute left-3.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -912,20 +980,19 @@
               id="input-pokedex-search"
               type="search"
               autocomplete="off"
-              placeholder="Escribe para buscar Pokémon por nombre, tipo, movimiento o rol..."
+              placeholder="Buscar Pokémon por nombre, tipo, movimiento o rol..."
               class="w-full min-h-[44px] rounded-xl bg-slate-950 border border-slate-700 pl-10 pr-9 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/30 transition"
             />
             <button
               id="btn-clear-pokedex-search"
               type="button"
               class="hidden absolute right-2.5 w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center text-xs font-bold"
-              title="Limpiar búsqueda"
+              title="Limpiar"
             >
               ✕
             </button>
           </div>
 
-          <!-- Chips Rápidos de Filtro en la Pokédex -->
           <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
             <button type="button" data-dex-filter="all" class="dex-filter-btn px-3 py-1 rounded-full text-xs font-bold bg-pink-500/20 text-pink-300 border border-pink-500/40 shrink-0">
               Todos
@@ -942,17 +1009,67 @@
           </div>
         </div>
 
-        <div id="pokedex-catalog-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
-          <!-- Se renderiza dinámicamente con los datos de POKE_DB -->
-        </div>
+        <div id="pokedex-catalog-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4"></div>
       </div>
     </section>
 
   </main>
 
   <!-- ========================================================================
-       BARRA DE NAVEGACIÓN INFERIOR FIJA PARA MÓVILES (APP-LIKE BOTTOM NAV)
+       MODAL DE GESTIÓN DE AMIGOS FIJOS
        ======================================================================== -->
+  <div id="modal-friend" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-indigo-500/40 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl relative">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="font-display text-sm sm:text-base font-bold text-white flex items-center gap-2">
+          <span>👥 Administrar Amigos Fijos</span>
+        </h3>
+        <button
+          id="btn-close-friend-modal"
+          type="button"
+          class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center text-xs font-bold"
+        >
+          ✕
+        </button>
+      </div>
+
+      <!-- Formulario para crear un nuevo amigo -->
+      <form id="form-add-friend" class="space-y-3 p-3.5 rounded-xl bg-slate-950 border border-slate-800">
+        <span class="text-xs font-bold uppercase tracking-wider text-indigo-300 block">➕ Añadir Nuevo Amigo:</span>
+        <div>
+          <input
+            id="input-friend-name"
+            type="text"
+            required
+            placeholder="Nombre o Mote (ej. Carlos, Laura, Hermano...)"
+            class="w-full min-h-[40px] rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+          />
+        </div>
+        <div>
+          <input
+            id="input-friend-notes"
+            type="text"
+            placeholder="Nota opcional (ej. Tiene a Groudon Primigenio 50)"
+            class="w-full min-h-[40px] rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+          />
+        </div>
+        <button
+          type="submit"
+          class="w-full py-2 px-3 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition"
+        >
+          Guardar Amigo
+        </button>
+      </form>
+
+      <!-- Lista de amigos existentes -->
+      <div class="space-y-2">
+        <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 block">Amigos Registrados:</span>
+        <div id="friends-manage-list" class="space-y-2 max-h-48 overflow-y-auto no-scrollbar"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BARRA INFERIOR MÓVIL -->
   <nav
     id="mobile-bottom-nav"
     class="sm:hidden fixed bottom-0 left-0 right-0 z-50 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800 px-2 py-1.5 grid grid-cols-3 gap-1 shadow-2xl"
@@ -971,7 +1088,7 @@
       class="nav-tab-btn flex flex-col items-center justify-center py-1.5 rounded-xl text-slate-400 font-semibold text-[11px]"
     >
       <span class="text-base leading-none mb-0.5">📦</span>
-      <span>Mi Caja</span>
+      <span>Cajas</span>
     </button>
     <button
       type="button"
@@ -983,19 +1100,15 @@
     </button>
   </nav>
 
-  <!-- ========================================================================
-       FOOTER
-       ======================================================================== -->
+  <!-- FOOTER -->
   <footer class="border-t border-slate-800/80 bg-slate-950/90 py-4 mt-8">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-      <span>PokéRaid &amp; Max Optimizer · Fórmulas oficiales de daño PoGO (CPM, STAB 1.2x, Eficacia 1.6x, Shadow 1.2x, Party Power &amp; Max Potency)</span>
-      <span class="font-mono text-emerald-400">v2.6 · Optimizado para Móvil &amp; Buscadores Rápidos</span>
+      <span>PokéRaid &amp; Max Optimizer · Equipos Compartidos &amp; Co-op Fijo</span>
+      <span class="font-mono text-emerald-400">v2.7 · Amigos Fijos &amp; Plantillas Rápidas</span>
     </div>
   </footer>
 
-  <!-- ========================================================================
-       SCRIPTS DE LA APLICACIÓN (Arquitectura Modular)
-       ======================================================================== -->
+  <!-- SCRIPTS -->
   <script src="data/pokemon_db.js"></script>
   <script src="js/box.js"></script>
   <script src="js/engine.js"></script>

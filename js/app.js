@@ -1,6 +1,10 @@
 /**
  * PokéRaid & Max Optimizer - Controlador Principal de Interfaz (js/app.js)
- * Optimizado para Móviles y con Buscadores de Lupa + Autocompletado en todos los apartados.
+ * Con:
+ *  - Guardado Rápido en Caja (Botones 1-Tap: 100% Nv. 50, Raid Nv. 40, Recién Atrapado Nv. 20)
+ *  - Gestión completa de Amigos Fijos (selector de dueño 'me' o amigo al guardar)
+ *  - Selección de Amigos Fijos en el Optimizador para simular incursión en grupo real
+ *  - Desglose visual ultra-claro de compañeros necesarios
  */
 
 (function (global) {
@@ -18,14 +22,13 @@
     weatherBoost: false,
     boxFilterQuery: "",
     boxFilterTag: "all",
+    boxSelectedOwner: "me",
+    activeCombatFriendIds: [],
     dexFilterQuery: "",
     dexFilterTag: "all",
     editingUid: null
   };
 
-  /**
-   * Normaliza texto eliminando tildes para búsquedas rápidas (ej. "dragon" encuentra "Dragón", " canón" encuentra "Cañón")
-   */
   function normalizeSearchText(str) {
     return String(str || "")
       .toLowerCase()
@@ -34,9 +37,6 @@
       .trim();
   }
 
-  /**
-   * Genera el HTML de una etiqueta de tipo Pokémon GO
-   */
   function renderTypeBadge(typeKey, extraClasses = "") {
     const db = global.POKE_DB;
     const tm = db.typeMeta[typeKey] || db.typeMeta.normal;
@@ -44,7 +44,7 @@
   }
 
   // ==========================================================================
-  // NAVEGACIÓN POR PESTAÑAS (SUPERIOR DESKTOP + BARRA INFERIOR MÓVIL)
+  // NAVEGACIÓN POR PESTAÑAS
   // ==========================================================================
   function initTabs() {
     const tabButtons = document.querySelectorAll(".nav-tab-btn");
@@ -85,7 +85,184 @@
   }
 
   // ==========================================================================
-  // MÓDULO 1: INTERFAZ DE "MI CAJA POKÉMON" Y BUSCADOR DE LUPA DE ESPECIES
+  // GESTIÓN Y SELECTOR DE AMIGOS
+  // ==========================================================================
+  function populateOwnerSelectors() {
+    const friends = global.PokeBoxManager.getFriends();
+
+    // Selector en el formulario de guardar
+    const formOwnerSelect = document.getElementById("select-form-owner");
+    if (formOwnerSelect) {
+      const currentVal = formOwnerSelect.value || "me";
+      formOwnerSelect.innerHTML = `
+        <option value="me">👤 Yo (Mi Caja Personal)</option>
+        ${friends
+          .map((f) => `<option value="${f.id}">👥 Amigo: ${f.name}</option>`)
+          .join("")}
+      `;
+      formOwnerSelect.value = currentVal;
+    }
+
+    // Selector de filtro de vista en Mi Caja
+    const boxOwnerFilter = document.getElementById("select-box-owner-filter");
+    if (boxOwnerFilter) {
+      boxOwnerFilter.innerHTML = `
+        <option value="me" ${state.boxSelectedOwner === "me" ? "selected" : ""}>👤 Mi Caja Personal</option>
+        <option value="all" ${state.boxSelectedOwner === "all" ? "selected" : ""}>🌐 Todos (Mía + Amigos)</option>
+        ${friends
+          .map(
+            (f) =>
+              `<option value="${f.id}" ${state.boxSelectedOwner === f.id ? "selected" : ""}>👥 Equipo de: ${f.name}</option>`
+          )
+          .join("")}
+      `;
+    }
+
+    // Lista de amigos seleccionables para el combate en el Optimizador
+    renderCombatFriendsList();
+  }
+
+  function renderCombatFriendsList() {
+    const container = document.getElementById("combat-friends-container");
+    if (!container) return;
+
+    const friends = global.PokeBoxManager.getFriends();
+    if (friends.length === 0) {
+      container.innerHTML = `
+        <div class="p-3 text-xs text-slate-400 text-center bg-slate-950/60 rounded-xl border border-slate-800">
+          No tienes amigos fijos guardados. Ve a la pestaña "Mi Caja" para añadir a tus amigos y sus Pokémon.
+        </div>
+      `;
+      return;
+    }
+
+    const allBox = global.PokeBoxManager.getAll("all");
+
+    container.innerHTML = friends
+      .map((f) => {
+        const count = allBox.filter((p) => p.ownerId === f.id).length;
+        const isChecked = state.activeCombatFriendIds.includes(f.id);
+        return `
+          <label class="flex items-center justify-between p-2.5 rounded-xl border transition cursor-pointer ${
+            isChecked
+              ? "bg-indigo-950/50 border-indigo-500/60 text-white"
+              : "bg-slate-950/70 border-slate-800 text-slate-400 hover:border-slate-700"
+          }">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <input
+                type="checkbox"
+                data-combat-friend-id="${f.id}"
+                ${isChecked ? "checked" : ""}
+                class="w-4 h-4 accent-pink-500 rounded cursor-pointer shrink-0"
+              />
+              <div class="min-w-0">
+                <span class="text-xs sm:text-sm font-bold block truncate text-slate-200">${f.name}</span>
+                <span class="text-[10px] font-mono text-cyan-400">${count} Pokémon guardados</span>
+              </div>
+            </div>
+            <span class="w-3 h-3 rounded-full shrink-0" style="background-color: ${f.avatarColor || '#06b6d4'}"></span>
+          </label>
+        `;
+      })
+      .join("");
+
+    container.querySelectorAll("[data-combat-friend-id]").forEach((cb) => {
+      cb.addEventListener("change", (e) => {
+        const fId = cb.getAttribute("data-combat-friend-id");
+        if (cb.checked) {
+          if (!state.activeCombatFriendIds.includes(fId)) {
+            state.activeCombatFriendIds.push(fId);
+          }
+        } else {
+          state.activeCombatFriendIds = state.activeCombatFriendIds.filter((id) => id !== fId);
+        }
+        renderCombatFriendsList();
+        runOptimizerCalculation();
+      });
+    });
+  }
+
+  function initFriendModalEvents() {
+    const btnNewFriend = document.getElementById("btn-add-friend-trigger");
+    const modal = document.getElementById("modal-friend");
+    const modalClose = document.getElementById("btn-close-friend-modal");
+    const friendForm = document.getElementById("form-add-friend");
+    const friendsManageList = document.getElementById("friends-manage-list");
+
+    if (btnNewFriend && modal) {
+      btnNewFriend.addEventListener("click", () => {
+        renderManageFriendsList();
+        modal.classList.remove("hidden");
+      });
+    }
+
+    if (modalClose && modal) {
+      modalClose.addEventListener("click", () => {
+        modal.classList.add("hidden");
+      });
+    }
+
+    if (friendForm) {
+      friendForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const nameInput = document.getElementById("input-friend-name");
+        const notesInput = document.getElementById("input-friend-notes");
+
+        global.PokeBoxManager.addFriend(nameInput.value, notesInput.value);
+        nameInput.value = "";
+        notesInput.value = "";
+
+        populateOwnerSelectors();
+        renderManageFriendsList();
+        renderMyBoxCards();
+        runOptimizerCalculation();
+      });
+    }
+
+    function renderManageFriendsList() {
+      if (!friendsManageList) return;
+      const friends = global.PokeBoxManager.getFriends();
+      if (friends.length === 0) {
+        friendsManageList.innerHTML = `<p class="text-xs text-slate-400 text-center py-2">No hay amigos registrados aún.</p>`;
+        return;
+      }
+
+      friendsManageList.innerHTML = friends
+        .map(
+          (f) => `
+          <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+            <div>
+              <strong class="text-xs sm:text-sm text-white">${f.name}</strong>
+              <p class="text-[11px] text-slate-400">${f.notes || "Sin notas"}</p>
+            </div>
+            <button
+              type="button"
+              data-delete-friend="${f.id}"
+              class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-rose-950/60 text-rose-300 hover:bg-rose-900 border border-rose-500/40"
+            >
+              Borrar
+            </button>
+          </div>
+        `
+        )
+        .join("");
+
+      friendsManageList.querySelectorAll("[data-delete-friend]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const fId = btn.getAttribute("data-delete-friend");
+          global.PokeBoxManager.removeFriend(fId);
+          state.activeCombatFriendIds = state.activeCombatFriendIds.filter((id) => id !== fId);
+          populateOwnerSelectors();
+          renderManageFriendsList();
+          renderMyBoxCards();
+          runOptimizerCalculation();
+        });
+      });
+    }
+  }
+
+  // ==========================================================================
+  // MÓDULO 1: FORMULARIO Y GUARDADO RÁPIDO (1-TAP PRESETS)
   // ==========================================================================
   function initBoxForm() {
     const db = global.POKE_DB;
@@ -100,7 +277,6 @@
     const ivAtkInput = document.getElementById("input-iv-atk");
     const ivDefInput = document.getElementById("input-iv-def");
     const ivStaInput = document.getElementById("input-iv-sta");
-    const hundoBtn = document.getElementById("btn-iv-hundo");
     const maxClassSelect = document.getElementById("select-box-max-class");
     const form = document.getElementById("pokemon-box-form");
     const cancelEditBtn = document.getElementById("btn-cancel-edit");
@@ -108,6 +284,7 @@
     const filterBoxInput = document.getElementById("input-filter-box");
     const clearBoxFilterBtn = document.getElementById("btn-clear-box-filter");
     const boxTagBtns = document.querySelectorAll(".box-tag-btn");
+    const boxOwnerFilter = document.getElementById("select-box-owner-filter");
     const clearBoxBtn = document.getElementById("btn-clear-box");
     const loadDemoBtn = document.getElementById("btn-load-demo-box");
 
@@ -119,7 +296,41 @@
       )
       .join("");
 
-    // Filtrar especies elegibles según lo escrito en el buscador de lupa
+    // Botones rápidos 1-Tap de IVs y Nivel (Gran comodidad)
+    document.querySelectorAll("[data-quick-preset]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const type = btn.getAttribute("data-quick-preset");
+        applyQuickPreset(type);
+      });
+    });
+
+    function applyQuickPreset(type) {
+      if (type === "hundo_50") {
+        ivAtkInput.value = 15;
+        ivDefInput.value = 15;
+        ivStaInput.value = 15;
+        presetSelect.value = "maxed"; // Nv 50
+        customCpInput.value = "";
+      } else if (type === "raid_40") {
+        ivAtkInput.value = 15;
+        ivDefInput.value = 14;
+        ivStaInput.value = 14;
+        presetSelect.value = "no_xl"; // Nv 40
+        customCpInput.value = "";
+      } else if (type === "caught_20") {
+        ivAtkInput.value = 12;
+        ivDefInput.value = 12;
+        ivStaInput.value = 12;
+        presetSelect.value = "caught"; // Nv 20-25
+        customCpInput.value = "";
+      } else if (type === "hundo_only") {
+        ivAtkInput.value = 15;
+        ivDefInput.value = 15;
+        ivStaInput.value = 15;
+      }
+      updateFormLivePreview();
+    }
+
     function getFilteredBoxSpecies(filterText = "") {
       const q = normalizeSearchText(filterText);
       return db.pokemon.filter((p) => {
@@ -160,7 +371,6 @@
         onSpeciesChange();
       }
 
-      // Renderizar lista desplegable táctil si hay texto escrito o foco
       if (showDropdown && filterText.trim().length > 0) {
         renderSpeciesAutocompleteDropdown(eligible);
       } else {
@@ -225,7 +435,6 @@
       });
     }
 
-    // Actualizar ataques disponibles, estado Oscuro y clase Max cuando cambia la especie
     function onSpeciesChange() {
       const speciesId = speciesSelect.value;
       const species = global.PokeBoxManager.getSpeciesById(speciesId);
@@ -273,7 +482,7 @@
     function updateMaxLevelsVisibility() {
       const maxPanel = document.getElementById("max-moves-levels-panel");
       const isMax = maxClassSelect.value !== "none";
-      maxPanel.classList.toggle("hidden", !isMax);
+      if (maxPanel) maxPanel.classList.toggle("hidden", !isMax);
     }
 
     function updateFormLivePreview() {
@@ -319,7 +528,6 @@
       }
     }
 
-    // Eventos del buscador de especie con lupa
     speciesSearchInput.addEventListener("input", (e) => {
       const val = e.target.value;
       clearSpeciesBtn.classList.toggle("hidden", !val);
@@ -347,20 +555,17 @@
       el.addEventListener("change", updateFormLivePreview);
     });
 
-    hundoBtn.addEventListener("click", () => {
-      ivAtkInput.value = 15;
-      ivDefInput.value = 15;
-      ivStaInput.value = 15;
-      updateFormLivePreview();
-    });
-
     cancelEditBtn.addEventListener("click", () => {
       resetBoxForm();
     });
 
     form.addEventListener("submit", (e) => {
       e.preventDefault();
+      const ownerSelect = document.getElementById("select-form-owner");
+      const ownerId = ownerSelect ? ownerSelect.value : "me";
+
       const payload = {
+        ownerId,
         pokemonId: speciesSelect.value,
         nickname: document.getElementById("input-box-nickname").value,
         ivAtk: Number(ivAtkInput.value),
@@ -388,7 +593,6 @@
       runOptimizerCalculation();
     });
 
-    // Eventos del buscador de lupa en Mi Colección Guardada
     filterBoxInput.addEventListener("input", (e) => {
       state.boxFilterQuery = e.target.value;
       clearBoxFilterBtn.classList.toggle("hidden", !state.boxFilterQuery);
@@ -415,14 +619,22 @@
       });
     });
 
+    if (boxOwnerFilter) {
+      boxOwnerFilter.addEventListener("change", () => {
+        state.boxSelectedOwner = boxOwnerFilter.value;
+        renderMyBoxCards();
+      });
+    }
+
     clearBoxBtn.addEventListener("click", () => {
-      global.PokeBoxManager.clearAll();
+      global.PokeBoxManager.clearAll(state.boxSelectedOwner);
       renderMyBoxCards();
       runOptimizerCalculation();
     });
 
     loadDemoBtn.addEventListener("click", () => {
       global.PokeBoxManager.loadDemoBox();
+      populateOwnerSelectors();
       renderMyBoxCards();
       runOptimizerCalculation();
     });
@@ -433,8 +645,8 @@
   function resetBoxForm() {
     state.editingUid = null;
     document.getElementById("form-pokemon-uid").value = "";
-    document.getElementById("box-form-title").textContent = "➕ Añadir Pokémon a Mi Caja";
-    document.getElementById("btn-save-pokemon").textContent = "💾 Guardar en Mi Caja Pokémon";
+    document.getElementById("box-form-title").textContent = "➕ Añadir Pokémon a la Caja";
+    document.getElementById("btn-save-pokemon").textContent = "💾 Guardar Pokémon";
     document.getElementById("btn-cancel-edit").classList.add("hidden");
     document.getElementById("input-species-search").value = "";
     document.getElementById("btn-clear-species-search").classList.add("hidden");
@@ -456,6 +668,9 @@
     document.getElementById("box-form-title").textContent = `✏️ Editando: ${entry.nickname}`;
     document.getElementById("btn-save-pokemon").textContent = "✅ Actualizar Pokémon";
     document.getElementById("btn-cancel-edit").classList.remove("hidden");
+
+    const ownerSelect = document.getElementById("select-form-owner");
+    if (ownerSelect) ownerSelect.value = entry.ownerId || "me";
 
     const speciesSelect = document.getElementById("select-box-species");
     document.getElementById("input-species-search").value = "";
@@ -488,16 +703,14 @@
     document.getElementById("pokemon-box-form").scrollIntoView({ behavior: "smooth" });
   }
 
-  /**
-   * Renderiza las tarjetas de Mi Caja Pokémon y actualiza los contadores del header
-   */
   function renderMyBoxCards() {
     const db = global.POKE_DB;
-    const allPokemon = global.PokeBoxManager.getAll();
+    const allPokemon = global.PokeBoxManager.getAll(state.boxSelectedOwner);
 
-    document.getElementById("header-box-count").textContent = allPokemon.length;
+    const myCount = global.PokeBoxManager.getAll("me").length;
+    document.getElementById("header-box-count").textContent = myCount;
     const tabBadge = document.getElementById("tab-box-badge");
-    if (tabBadge) tabBadge.textContent = allPokemon.length;
+    if (tabBadge) tabBadge.textContent = myCount;
 
     const grid = document.getElementById("my-box-cards-grid");
     const q = normalizeSearchText(state.boxFilterQuery);
@@ -516,8 +729,10 @@
       if (!q) return true;
       const typeNames = item.species.types.map((t) => db.typeMeta[t].name).join(" ");
       const maxMoveName = item.maxMoveInfo ? item.maxMoveInfo.moveName : "";
+      const ownerObj = global.PokeBoxManager.getFriendById(item.ownerId || "me");
+      const ownerName = ownerObj ? ownerObj.name : "";
       const haystack = normalizeSearchText(
-        `${item.nickname} ${item.species.name} #${item.species.dex} ${typeNames} ${item.fastMoveObj.name} ${item.chargedMoveObj.name} ${maxMoveName}`
+        `${item.nickname} ${item.species.name} #${item.species.dex} ${typeNames} ${item.fastMoveObj.name} ${item.chargedMoveObj.name} ${maxMoveName} ${ownerName}`
       );
       return haystack.includes(q);
     });
@@ -525,8 +740,8 @@
     if (filtered.length === 0) {
       grid.innerHTML = `
         <div class="col-span-full p-6 sm:p-8 rounded-2xl bg-slate-950/80 border border-dashed border-slate-700 text-center space-y-2">
-          <p class="text-sm font-bold text-slate-300">No se encontraron Pokémon en tu caja</p>
-          <p class="text-xs text-slate-400">Prueba con otro término en el buscador o pulsa <strong>"⚡ Demo"</strong> arriba a la derecha.</p>
+          <p class="text-sm font-bold text-slate-300">No se encontraron Pokémon en esta selección</p>
+          <p class="text-xs text-slate-400">Guarda un Pokémon con el formulario o pulsa <strong>"⚡ Demo"</strong> arriba a la derecha.</p>
         </div>
       `;
       return;
@@ -536,8 +751,14 @@
       .map((item) => {
         const typeBadges = item.species.types.map((t) => renderTypeBadge(t)).join(" ");
         const shadowBadge = item.isShadow
-          ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-purple-600/30 text-purple-200 border border-purple-400/50">🟣 Oscuro +20%</span>`
+          ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-purple-600/30 text-purple-200 border border-purple-400/50">🟣 Oscuro</span>`
           : "";
+
+        const ownerObj = global.PokeBoxManager.getFriendById(item.ownerId || "me");
+        const isFriend = item.ownerId && item.ownerId !== "me";
+        const ownerBadge = isFriend
+          ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border bg-indigo-950/80 border-indigo-500/50 text-indigo-300">👥 ${ownerObj ? ownerObj.name : "Amigo"}</span>`
+          : `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border bg-cyan-950/80 border-cyan-500/40 text-cyan-300">👤 Mío</span>`;
 
         let maxBadge = "";
         if (item.maxMoveInfo && item.maxMoveInfo.isMaxCapable) {
@@ -563,6 +784,7 @@
               <div class="flex items-start justify-between gap-2">
                 <div class="min-w-0">
                   <div class="flex items-center gap-1.5 flex-wrap">
+                    ${ownerBadge}
                     <span class="font-mono text-[11px] text-slate-400">#${item.species.dex}</span>
                     <span class="px-2 py-0.5 rounded-full font-mono text-[11px] font-extrabold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">PC ${item.cp}</span>
                     <span class="font-mono text-[11px] text-slate-400">${item.levelBadge}</span>
@@ -639,7 +861,7 @@
   }
 
   // ==========================================================================
-  // MÓDULO 2 Y 3: BUSCADOR DE LUPA DE JEFE, CONDICIONES Y MOTOR DE RECOMENDACIÓN
+  // MÓDULO 2 Y 3: OPTIMIZADOR Y CALCULADORA ULTRA-CLARA
   // ==========================================================================
   function initOptimizerControls() {
     const db = global.POKE_DB;
@@ -660,7 +882,6 @@
 
     const bossCandidates = db.pokemon.filter((p) => p.isBossCandidate);
 
-    // Poblar modos de combate
     modeSelect.innerHTML = Object.values(db.battleModes)
       .map(
         (m) =>
@@ -670,7 +891,6 @@
       )
       .join("");
 
-    // Poblar selector nativo de jefes
     function populateBossSelectOptions(list = bossCandidates) {
       bossSelect.innerHTML = list
         .map(
@@ -682,7 +902,6 @@
         .join("");
     }
 
-    // Chips rápidos táctiles para elegir los jefes más buscados con 1 toque en móvil
     const featuredBossIds = [
       "eternatus",
       "duraludon_gmax",
@@ -732,7 +951,6 @@
       populateBossSelectOptions(bossCandidates);
       bossSelect.value = boss.id;
 
-      // Sugerir modo por defecto del jefe si aplica
       if (Array.isArray(boss.defaultBossModes) && boss.defaultBossModes.length > 0) {
         if (!boss.defaultBossModes.includes(state.selectedBattleModeId)) {
           state.selectedBattleModeId = boss.defaultBossModes[0];
@@ -746,7 +964,6 @@
       runOptimizerCalculation();
     }
 
-    // Búsqueda instantánea con lupa para el Jefe
     bossSearchInput.addEventListener("input", (e) => {
       const val = e.target.value;
       clearBossSearchBtn.classList.toggle("hidden", !val);
@@ -901,7 +1118,6 @@
       runOptimizerCalculation();
     });
 
-    // Cerrar desplegables de autocompletado al tocar fuera
     document.addEventListener("click", (e) => {
       if (!e.target.closest("#input-boss-search") && !e.target.closest("#boss-search-dropdown")) {
         bossDropdown.classList.add("hidden");
@@ -921,13 +1137,10 @@
     populateBossMoves();
   }
 
-  /**
-   * Ejecuta el motor matemático y actualiza toda la vista de resultados (Módulo 2 y Módulo 3)
-   */
   function runOptimizerCalculation() {
-    const boxList = global.PokeBoxManager.getAll();
+    const allBoxList = global.PokeBoxManager.getAll("all");
     const plan = global.PokeOptimizerEngine.calculateBattlePlan(
-      boxList,
+      allBoxList,
       state.selectedBossId,
       state.selectedBattleModeId,
       {
@@ -938,7 +1151,8 @@
         friendship: state.friendship,
         megaBonus: state.megaBonus,
         weatherBoost: state.weatherBoost
-      }
+      },
+      state.activeCombatFriendIds
     );
 
     renderBossSummary(plan.bossProfile, plan.battleMode);
@@ -991,15 +1205,19 @@
   }
 
   function renderCalculationResults(plan) {
-    const { personalMetrics, scenarios, team, battleMode, bossProfile, missingMaxWarning } = plan;
+    const { personalMetrics, scenarios, team, battleMode, bossProfile, missingMaxWarning, friendsBreakdown } = plan;
 
     const verdictBadge = document.getElementById("verdict-badge");
-    if (personalMetrics.canSolo) {
-      verdictBadge.textContent = "🏆 ¡SOLABLE EN SOLITARIO!";
+    if (personalMetrics.canBeatWithFriends) {
+      if (friendsBreakdown.length > 0) {
+        verdictBadge.textContent = "🎉 ¡VICTORIA CON TU GRUPO DE AMIGOS!";
+      } else {
+        verdictBadge.textContent = "🏆 ¡SOLABLE EN SOLITARIO!";
+      }
       verdictBadge.className =
         "px-3 py-1.5 rounded-xl font-mono text-[11px] sm:text-xs font-bold uppercase tracking-wider bg-emerald-500/25 text-emerald-300 border border-emerald-500/50";
     } else if (scenarios.standard.count <= 2) {
-      verdictBadge.textContent = `✅ DÚO / TRÍO ASEQUIBLE (+${scenarios.hardcore.count} a +${scenarios.standard.count})`;
+      verdictBadge.textContent = `✅ DÚO / TRÍO FACTIBLE (+${scenarios.hardcore.count} a +${scenarios.standard.count})`;
       verdictBadge.className =
         "px-3 py-1.5 rounded-xl font-mono text-[11px] sm:text-xs font-bold uppercase tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-500/40";
     } else {
@@ -1008,11 +1226,12 @@
         "px-3 py-1.5 rounded-xl font-mono text-[11px] sm:text-xs font-bold uppercase tracking-wider bg-pink-500/25 text-pink-300 border border-pink-500/50";
     }
 
-    document.getElementById("personal-damage-pct").textContent = `${personalMetrics.personalDamagePct}%`;
-    document.getElementById("personal-damage-raw").textContent = `(${personalMetrics.personalDamage.toLocaleString()} / ${bossProfile.hp.toLocaleString()} HP)`;
+    // Porcentaje personal y grupal
+    document.getElementById("personal-damage-pct").textContent = `${personalMetrics.combinedGroupPct}%`;
+    document.getElementById("personal-damage-raw").textContent = `(${personalMetrics.combinedGroupDamage.toLocaleString()} / ${bossProfile.hp.toLocaleString()} HP)`;
     document.getElementById("personal-damage-bar").style.width = `${Math.min(
       100,
-      personalMetrics.personalDamagePct
+      personalMetrics.combinedGroupPct
     )}%`;
 
     document.getElementById("metric-team-dps").textContent = `${personalMetrics.teamDPS} /s`;
@@ -1021,12 +1240,59 @@
 
     document.getElementById("direct-recommendation-text").textContent = plan.directRecommendation;
 
+    // Sección de amigos fijos activos aportando al combate
+    const friendsContributionWrap = document.getElementById("friends-contribution-summary");
+    if (friendsContributionWrap) {
+      if (friendsBreakdown.length > 0) {
+        friendsContributionWrap.classList.remove("hidden");
+        friendsContributionWrap.innerHTML = `
+          <div class="p-3.5 rounded-xl bg-indigo-950/40 border border-indigo-500/40 space-y-2">
+            <span class="text-xs font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
+              <span>👥 Aporte de tus Amigos Fijos Seleccionados:</span>
+            </span>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div class="p-2 rounded-lg bg-slate-900/80 border border-slate-800 text-xs">
+                <span class="text-slate-400">👤 Tu Aporte Personal:</span>
+                <strong class="text-cyan-300 block font-mono text-sm">${personalMetrics.personalDamagePct}% (${personalMetrics.personalDamage.toLocaleString()} HP)</strong>
+              </div>
+              ${friendsBreakdown
+                .map((f) => {
+                  const warning = !f.hasPokemon
+                    ? '<span class="text-rose-400 block text-[10px]">Sin Pokémon en su caja</span>'
+                    : "";
+                  return `
+                  <div class="p-2 rounded-lg bg-slate-900/80 border border-slate-800 text-xs">
+                    <span class="text-slate-400">👥 ${f.friend.name}:</span>
+                    <strong class="text-pink-300 block font-mono text-sm">${f.performance.pct}% (${f.performance.damage.toLocaleString()} HP)</strong>
+                    ${warning}
+                  </div>
+                `;
+                })
+                .join("")}
+            </div>
+          </div>
+        `;
+      } else {
+        friendsContributionWrap.classList.add("hidden");
+        friendsContributionWrap.innerHTML = "";
+      }
+    }
+
+    // Escenarios claros
     document.getElementById("scenario-hardcore-count").textContent =
-      scenarios.hardcore.count === 0 ? "0 (Solo)" : `+${scenarios.hardcore.count} jug.`;
+      scenarios.hardcore.count === 0 ? "0 (¡Ya ganas!)" : `+${scenarios.hardcore.count}`;
+    document.getElementById("scenario-hardcore-pct").textContent =
+      scenarios.hardcore.count === 0 ? "HP Cubierto" : `Bajan ~${scenarios.hardcore.pctPerPlayer}% c/u`;
+
     document.getElementById("scenario-standard-count").textContent =
-      scenarios.standard.count === 0 ? "0 (Solo)" : `+${scenarios.standard.count} jug.`;
+      scenarios.standard.count === 0 ? "0 (¡Ya ganas!)" : `+${scenarios.standard.count}`;
+    document.getElementById("scenario-standard-pct").textContent =
+      scenarios.standard.count === 0 ? "HP Cubierto" : `Bajan ~${scenarios.standard.pctPerPlayer}% c/u`;
+
     document.getElementById("scenario-casual-count").textContent =
-      scenarios.casual.count === 0 ? "0 (Solo)" : `+${scenarios.casual.count}+ jug.`;
+      scenarios.casual.count === 0 ? "0 (¡Ya ganas!)" : `+${scenarios.casual.count}`;
+    document.getElementById("scenario-casual-pct").textContent =
+      scenarios.casual.count === 0 ? "HP Cubierto" : `Bajan ~${scenarios.casual.pctPerPlayer}% c/u`;
 
     const teamTitle = document.getElementById("recommended-team-title");
     const teamSubtitle = document.getElementById("recommended-team-subtitle");
@@ -1049,7 +1315,7 @@
     if (team.length === 0) {
       teamGrid.innerHTML = `
         <div class="col-span-full p-6 rounded-xl bg-slate-950 border border-slate-800 text-center text-xs text-slate-400">
-          Añade Pokémon a "Mi Caja Pokémon" para ver tu alineación ideal contra este jefe.
+          Añade Pokémon a tu Caja Personal para ver tu alineación ideal contra este jefe.
         </div>
       `;
       return;
@@ -1126,7 +1392,7 @@
   }
 
   // ==========================================================================
-  // CATÁLOGO POKÉDEX META CON BUSCADOR DE LUPA Y ACCIÓN RÁPIDA (VISTA 3)
+  // CATÁLOGO POKÉDEX META CON ACCIÓN RÁPIDA (VISTA 3)
   // ==========================================================================
   function initPokedexSearch() {
     const searchInput = document.getElementById("input-pokedex-search");
@@ -1229,7 +1495,7 @@
               data-quick-add-box="${p.id}"
               class="mt-3 w-full py-1.5 px-3 rounded-lg text-xs font-bold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 transition"
             >
-              ➕ Enviar al Formulario de Mi Caja
+              ➕ Cargar en Formulario de Caja
             </button>`
           : "";
 
@@ -1273,11 +1539,12 @@
     });
   }
 
-  // Inicialización al cargar el DOM
   document.addEventListener("DOMContentLoaded", () => {
     global.POKE_APP_INITIALIZED = true;
     initTabs();
     initBoxForm();
+    initFriendModalEvents();
+    populateOwnerSelectors();
     initOptimizerControls();
     initPokedexSearch();
     renderMyBoxCards();

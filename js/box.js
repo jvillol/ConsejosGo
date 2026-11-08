@@ -1,19 +1,20 @@
 /**
- * PokéRaid & Max Optimizer - Módulo 1: Gestión de "Mi Caja Pokémon" (js/box.js)
+ * PokéRaid & Max Optimizer - Módulo 1 y Amigos: Gestión de Colección y Amigos (js/box.js)
  * Maneja:
- *  - Persistencia en localStorage
- *  - Cálculo exacto de Estadísticas Reales (Ataque, Defensa, PS), CPM y PC (Combat Power)
- *  - Estimación inversa de Nivel/CPM cuando el usuario introduce los PC directamente
- *  - Resolución del Movimiento Max (Dinamax según tipo de ataque rápido, Gigamax/Eternamax fijo)
- *  - Operaciones CRUD (Crear, Leer, Actualizar, Eliminar, Cargar Demo, Vaciar)
+ *  - Persistencia en localStorage tanto de Mi Caja como de Amigos Fijos
+ *  - Cálculo exacto de Estadísticas Reales, CPM y PC
+ *  - Soporte de Propietario (owner: 'me' | friendId)
+ *  - Plantillas Rápidas (Presets 1-Tap: Raid Ready Nv. 40, Hundo Nv. 50, Raid Nv. 30, etc.)
+ *  - Gestión CRUD completa de Amigos Fijos y sus equipos
  */
 
 (function (global) {
   "use strict";
 
-  const STORAGE_KEY = "pokeraid_max_optimizer_box_v2";
+  const STORAGE_KEY_BOX = "pokeraid_max_optimizer_box_v2";
+  const STORAGE_KEY_FRIENDS = "pokeraid_max_optimizer_friends_v1";
 
-  // Mapa rápido de niveles ordenados y sus valores de CPM interpolados (Nivel 15 a 51 en pasos de 0.5)
+  // Lista CPM interpolada (Nivel 15 a 51)
   const FULL_CPM_LIST = [
     { level: 15, cpm: 0.51739395 },
     { level: 16, cpm: 0.53435433 },
@@ -59,27 +60,18 @@
     { level: 51, cpm: 0.84529999 }
   ];
 
-  /**
-   * Obtiene la referencia a la base de datos maestra
-   */
   function getDB() {
     if (!global.POKE_DB) {
-      throw new Error("POKE_DB no está cargado. Asegúrate de incluir data/pokemon_db.js antes de js/box.js");
+      throw new Error("POKE_DB no está cargado.");
     }
     return global.POKE_DB;
   }
 
-  /**
-   * Busca una especie en POKE_DB por su ID
-   */
   function getSpeciesById(pokemonId) {
     const db = getDB();
     return db.pokemon.find((p) => p.id === pokemonId) || null;
   }
 
-  /**
-   * Obtiene el CPM para un nivel concreto
-   */
   function getCPMForLevel(level) {
     const numLevel = Number(level) || 40;
     let closest = FULL_CPM_LIST[0];
@@ -95,9 +87,6 @@
     return closest.cpm;
   }
 
-  /**
-   * Calcula los PC (Combat Power) oficiales de Pokémon GO dados especie, IVs y CPM/Nivel
-   */
   function calculateCP(species, ivAtk, ivDef, ivSta, levelOrCpm) {
     if (!species) return 10;
     const cpm = levelOrCpm <= 1.0 ? levelOrCpm : getCPMForLevel(levelOrCpm);
@@ -111,9 +100,6 @@
     return Math.max(10, rawCP);
   }
 
-  /**
-   * Estima el Nivel y Preset más cercano a partir de los PC introducidos por el usuario
-   */
   function estimateLevelFromCP(species, ivAtk, ivDef, ivSta, targetCP) {
     if (!species || !targetCP || Number(targetCP) < 10) {
       return { level: 40, cpm: getCPMForLevel(40), presetId: "no_xl" };
@@ -132,9 +118,8 @@
       }
     }
 
-    // Asignar el preset más cercano para mantener coherencia visual en el selector
     const db = getDB();
-    let bestPreset = db.levelPresets[2]; // default no_xl (Nv. 40)
+    let bestPreset = db.levelPresets[2];
     let minLevelDiff = Infinity;
     for (const preset of db.levelPresets) {
       const d = Math.abs(preset.level - bestEntry.level);
@@ -151,9 +136,6 @@
     };
   }
 
-  /**
-   * Resuelve la información del Movimiento Max (Dinamax, Gigamax o Eternamax) de un Pokémon de la caja
-   */
   function resolveMaxMoveInfo(species, rawEntry) {
     const db = getDB();
     const maxClass = rawEntry.maxClass || (species && species.maxForm) || "none";
@@ -174,7 +156,6 @@
       };
     }
 
-    // Si es Gigamax o Eternamax y tiene movimiento exclusivo fijo en la BD
     if ((maxClass === "gigantamax" || maxClass === "eternamax") && species && species.fixedGmaxMove) {
       const gmaxMove = db.gmaxMoves[species.fixedGmaxMove];
       const potencyTable =
@@ -195,7 +176,6 @@
       };
     }
 
-    // Si es Dinamax (o un Gigamax usado como Dinamax sin mov fijo), el tipo depende del Ataque Rápido
     const fastMoveObj = db.fastMoves[rawEntry.fastMove] || db.fastMoves[species.fastMoves[0]];
     const maxMoveType = fastMoveObj ? fastMoveObj.type : species.types[0];
     const typeMeta = db.typeMeta[maxMoveType] || db.typeMeta.normal;
@@ -219,9 +199,6 @@
     };
   }
 
-  /**
-   * Enriquecer un registro crudo de Mi Caja con todas sus estadísticas calculadas y referencias de objetos
-   */
   function enrichBoxPokemon(rawEntry) {
     const db = getDB();
     const species = getSpeciesById(rawEntry.pokemonId);
@@ -232,13 +209,11 @@
     const ivSta = Math.min(15, Math.max(0, Number(rawEntry.ivSta ?? 15)));
     const ivPct = Math.round(((ivAtk + ivDef + ivSta) / 45) * 1000) / 10;
 
-    // Determinar nivel y CPM
     const presetObj =
       db.levelPresets.find((p) => p.id === rawEntry.levelPreset) || db.levelPresets[2];
     const level = Number(rawEntry.level) || presetObj.level;
     const cpm = getCPMForLevel(level);
 
-    // Estadísticas reales de combate (antes de modificadores de combate como Shadow)
     const baseAtkWithIV = species.baseStats.atk + ivAtk;
     const baseDefWithIV = species.baseStats.def + ivDef;
     const baseStaWithIV = species.baseStats.sta + ivSta;
@@ -265,9 +240,11 @@
       db.chargedMoves[rawEntry.chargedMove] || db.chargedMoves[species.chargedMoves[0]];
 
     const maxMoveInfo = resolveMaxMoveInfo(species, rawEntry);
+    const ownerId = rawEntry.ownerId || "me";
 
     return {
       ...rawEntry,
+      ownerId,
       ivAtk,
       ivDef,
       ivSta,
@@ -292,16 +269,15 @@
     };
   }
 
-  /**
-   * Lee la lista cruda desde localStorage. Si nunca se ha inicializado, carga la caja Demo inicial.
-   */
   function loadRawBox() {
     const db = getDB();
     try {
-      const raw = global.localStorage.getItem(STORAGE_KEY);
+      const raw = global.localStorage.getItem(STORAGE_KEY_BOX);
       if (!raw) {
-        // Primera visita: inicializar con starterDemoBox para que el usuario vea resultados al instante
-        const initialBox = JSON.parse(JSON.stringify(db.starterDemoBox || []));
+        const initialBox = (db.starterDemoBox || []).map((p) => ({
+          ...p,
+          ownerId: "me"
+        }));
         saveRawBox(initialBox);
         return initialBox;
       }
@@ -313,14 +289,52 @@
     }
   }
 
-  /**
-   * Guarda la lista cruda en localStorage
-   */
   function saveRawBox(list) {
     try {
-      global.localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+      global.localStorage.setItem(STORAGE_KEY_BOX, JSON.stringify(list));
     } catch (err) {
       console.error("Error guardando Mi Caja en localStorage:", err);
+    }
+  }
+
+  // ============================================================================
+  // GESTIÓN DE AMIGOS FIJOS (Persistencia y Equipos)
+  // ============================================================================
+  const DEFAULT_DEMO_FRIENDS = [
+    {
+      id: "friend_carlos",
+      name: "Carlos (Meta Top)",
+      avatarColor: "#06b6d4",
+      notes: "Tiene a Groudon Primigenio y Mewtwo Nv. 50"
+    },
+    {
+      id: "friend_laura",
+      name: "Laura (D-Max & Raids)",
+      avatarColor: "#ec4899",
+      notes: "Especialista Dinamax y Gigamax"
+    }
+  ];
+
+  function loadRawFriends() {
+    try {
+      const raw = global.localStorage.getItem(STORAGE_KEY_FRIENDS);
+      if (!raw) {
+        saveRawFriends(DEFAULT_DEMO_FRIENDS);
+        return DEFAULT_DEMO_FRIENDS;
+      }
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (err) {
+      console.error("Error leyendo Amigos de localStorage:", err);
+      return DEFAULT_DEMO_FRIENDS;
+    }
+  }
+
+  function saveRawFriends(list) {
+    try {
+      global.localStorage.setItem(STORAGE_KEY_FRIENDS, JSON.stringify(list));
+    } catch (err) {
+      console.error("Error guardando Amigos en localStorage:", err);
     }
   }
 
@@ -328,26 +342,26 @@
   // API PÚBLICA DE PokeBoxManager
   // ==========================================================================
   const PokeBoxManager = {
-    STORAGE_KEY,
+    STORAGE_KEY_BOX,
+    STORAGE_KEY_FRIENDS,
 
     /**
-     * Devuelve todos los Pokémon guardados en Mi Caja enriquecidos con stats, PC y movimientos
+     * Devuelve Pokémon enriquecidos. Si targetOwner es 'me', sólo los propios.
+     * Si es un ID de amigo, los del amigo. Si es 'all', todos.
      */
-    getAll() {
+    getAll(targetOwner = "all") {
       const rawList = loadRawBox();
-      return rawList.map(enrichBoxPokemon).filter(Boolean);
+      const enriched = rawList.map(enrichBoxPokemon).filter(Boolean);
+      if (targetOwner === "all") return enriched;
+      return enriched.filter((item) => (item.ownerId || "me") === targetOwner);
     },
 
-    /**
-     * Busca un Pokémon concreto en Mi Caja por su UID
-     */
     getByUid(uid) {
-      return this.getAll().find((item) => item.uid === uid) || null;
+      const rawList = loadRawBox();
+      const raw = rawList.find((item) => item.uid === uid);
+      return raw ? enrichBoxPokemon(raw) : null;
     },
 
-    /**
-     * Añade un nuevo Pokémon a Mi Caja
-     */
     add(entryData) {
       const db = getDB();
       const species = getSpeciesById(entryData.pokemonId);
@@ -360,7 +374,6 @@
         entryData.uid ||
         `pkmn_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
-      // Determinar nivel desde PC personalizado si se proporcionó, o desde el preset elegido
       let level = Number(entryData.level) || 40;
       let levelPreset = entryData.levelPreset || "no_xl";
 
@@ -380,8 +393,11 @@
       }
 
       const maxClass = entryData.maxClass || "none";
+      const ownerId = entryData.ownerId || "me";
+
       const newRecord = {
         uid,
+        ownerId,
         pokemonId: species.id,
         nickname: (entryData.nickname || "").trim() || species.name,
         ivAtk: Math.min(15, Math.max(0, Number(entryData.ivAtk ?? 15))),
@@ -404,9 +420,6 @@
       return enrichBoxPokemon(newRecord);
     },
 
-    /**
-     * Actualiza un Pokémon existente en Mi Caja por su UID
-     */
     update(uid, updatedData) {
       const db = getDB();
       const rawList = loadRawBox();
@@ -435,9 +448,12 @@
       }
 
       const maxClass = updatedData.maxClass || "none";
+      const ownerId = updatedData.ownerId || rawList[index].ownerId || "me";
+
       const updatedRecord = {
         ...rawList[index],
         uid,
+        ownerId,
         pokemonId: species.id,
         nickname: (updatedData.nickname || "").trim() || species.name,
         ivAtk: Math.min(15, Math.max(0, Number(updatedData.ivAtk ?? 15))),
@@ -460,9 +476,6 @@
       return enrichBoxPokemon(updatedRecord);
     },
 
-    /**
-     * Elimina un Pokémon de Mi Caja por su UID
-     */
     remove(uid) {
       const rawList = loadRawBox();
       const filtered = rawList.filter((item) => item.uid !== uid);
@@ -470,25 +483,131 @@
       return filtered.length;
     },
 
-    /**
-     * Vacía por completo Mi Caja Pokémon
-     */
-    clearAll() {
-      saveRawBox([]);
-      return [];
+    clearAll(targetOwner = "me") {
+      if (targetOwner === "all") {
+        saveRawBox([]);
+        return [];
+      }
+      const rawList = loadRawBox();
+      const filtered = rawList.filter((item) => (item.ownerId || "me") !== targetOwner);
+      saveRawBox(filtered);
+      return this.getAll();
     },
 
-    /**
-     * Restaura o fusiona la Caja Demo Meta (Eternatus, Duraludon Gigamax, Excadrill D-Max, Groudon Primigenio, etc.)
-     */
     loadDemoBox() {
       const db = getDB();
-      const demoClone = JSON.parse(JSON.stringify(db.starterDemoBox || []));
+      const demoClone = (db.starterDemoBox || []).map((p) => ({
+        ...p,
+        ownerId: "me"
+      }));
+
+      // Añadimos también algunos Pokémon a amigos demo para que se aprecie la potencia del sistema
+      const friends = this.getFriends();
+      if (friends.length > 0) {
+        demoClone.push(
+          {
+            uid: "demo_friend_carlos_groudon",
+            ownerId: friends[0].id,
+            pokemonId: "groudon_primal",
+            nickname: "Groudon Primigenio de Carlos",
+            ivAtk: 15,
+            ivDef: 15,
+            ivSta: 14,
+            levelPreset: "maxed",
+            level: 50,
+            fastMove: "disparo_lodo",
+            chargedMove: "filo_del_abismo",
+            isShadow: false,
+            maxClass: "none",
+            maxAttackLevel: 0,
+            maxGuardLevel: 0,
+            maxSpiritLevel: 0
+          },
+          {
+            uid: "demo_friend_carlos_mewtwo",
+            ownerId: friends[0].id,
+            pokemonId: "mewtwo",
+            nickname: "Mewtwo 100% de Carlos",
+            ivAtk: 15,
+            ivDef: 15,
+            ivSta: 15,
+            levelPreset: "maxed",
+            level: 50,
+            fastMove: "psicocorte",
+            chargedMove: "onda_mental",
+            isShadow: true,
+            maxClass: "none",
+            maxAttackLevel: 0,
+            maxGuardLevel: 0,
+            maxSpiritLevel: 0
+          }
+        );
+        if (friends.length > 1) {
+          demoClone.push({
+            uid: "demo_friend_laura_duraludon",
+            ownerId: friends[1].id,
+            pokemonId: "duraludon_gmax",
+            nickname: "Duraludon G-Max de Laura",
+            ivAtk: 15,
+            ivDef: 15,
+            ivSta: 15,
+            levelPreset: "maxed",
+            level: 50,
+            fastMove: "cola_dragon",
+            chargedMove: "garra_dragon",
+            isShadow: false,
+            maxClass: "gigantamax",
+            maxAttackLevel: 3,
+            maxGuardLevel: 3,
+            maxSpiritLevel: 2
+          });
+        }
+      }
+
       saveRawBox(demoClone);
       return this.getAll();
     },
 
-    // Utilidades matemáticas expuestas para previsualización en tiempo real en el formulario
+    // ========================================================================
+    // MÉTODOS DE AMIGOS
+    // ========================================================================
+    getFriends() {
+      return loadRawFriends();
+    },
+
+    getFriendById(friendId) {
+      if (friendId === "me") {
+        return { id: "me", name: "Mi Caja Personal", avatarColor: "#06b6d4" };
+      }
+      return loadRawFriends().find((f) => f.id === friendId) || null;
+    },
+
+    addFriend(name, notes = "") {
+      const friends = loadRawFriends();
+      const id = `friend_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      const colors = ["#06b6d4", "#ec4899", "#8b5cf6", "#10b981", "#f59e0b", "#ef4444", "#3b82f6"];
+      const avatarColor = colors[friends.length % colors.length];
+
+      const newFriend = {
+        id,
+        name: (name || "").trim() || `Amigo ${friends.length + 1}`,
+        notes: (notes || "").trim(),
+        avatarColor
+      };
+      friends.push(newFriend);
+      saveRawFriends(friends);
+      return newFriend;
+    },
+
+    removeFriend(friendId) {
+      const friends = loadRawFriends().filter((f) => f.id !== friendId);
+      saveRawFriends(friends);
+      // Eliminar también los Pokémon asociados a este amigo
+      const rawList = loadRawBox().filter((p) => p.ownerId !== friendId);
+      saveRawBox(rawList);
+      return friends;
+    },
+
     calculateCP,
     estimateLevelFromCP,
     getCPMForLevel,
