@@ -1,6 +1,6 @@
 /**
  * PokéRaid & Max Optimizer - Controlador Principal de Interfaz (js/app.js)
- * Conecta POKE_DB, PokeBoxManager (localStorage) y PokeOptimizerEngine con el DOM.
+ * Optimizado para Móviles y con Buscadores de Lupa + Autocompletado en todos los apartados.
  */
 
 (function (global) {
@@ -17,8 +17,22 @@
     megaBonus: "none",
     weatherBoost: false,
     boxFilterQuery: "",
+    boxFilterTag: "all",
+    dexFilterQuery: "",
+    dexFilterTag: "all",
     editingUid: null
   };
+
+  /**
+   * Normaliza texto eliminando tildes para búsquedas rápidas (ej. "dragon" encuentra "Dragón", " canón" encuentra "Cañón")
+   */
+  function normalizeSearchText(str) {
+    return String(str || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim();
+  }
 
   /**
    * Genera el HTML de una etiqueta de tipo Pokémon GO
@@ -29,13 +43,11 @@
     return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${tm.bg} ${tm.text} ${tm.border} ${extraClasses}">${tm.name}</span>`;
   }
 
-  /**
-   * Inicializa la navegación por pestañas
-   */
+  // ==========================================================================
+  // NAVEGACIÓN POR PESTAÑAS (SUPERIOR DESKTOP + BARRA INFERIOR MÓVIL)
+  // ==========================================================================
   function initTabs() {
     const tabButtons = document.querySelectorAll(".nav-tab-btn");
-    const tabPanels = document.querySelectorAll(".tab-panel");
-
     tabButtons.forEach((btn) => {
       btn.addEventListener("click", () => {
         const targetId = btn.getAttribute("data-tab-target");
@@ -50,11 +62,21 @@
 
     tabButtons.forEach((b) => {
       const isTarget = b.getAttribute("data-tab-target") === targetId;
-      b.classList.toggle("border-pink-500", isTarget);
-      b.classList.toggle("bg-slate-900/90", isTarget);
-      b.classList.toggle("text-white", isTarget);
-      b.classList.toggle("border-transparent", !isTarget);
-      b.classList.toggle("text-slate-400", !isTarget);
+      const isMobileNav = Boolean(b.closest("#mobile-bottom-nav"));
+
+      if (isMobileNav) {
+        b.classList.toggle("bg-slate-900", isTarget);
+        b.classList.toggle("text-pink-400", isTarget);
+        b.classList.toggle("font-bold", isTarget);
+        b.classList.toggle("text-slate-400", !isTarget);
+        b.classList.toggle("font-semibold", !isTarget);
+      } else {
+        b.classList.toggle("border-pink-500", isTarget);
+        b.classList.toggle("bg-slate-900/90", isTarget);
+        b.classList.toggle("text-white", isTarget);
+        b.classList.toggle("border-transparent", !isTarget);
+        b.classList.toggle("text-slate-400", !isTarget);
+      }
     });
 
     tabPanels.forEach((panel) => {
@@ -63,12 +85,16 @@
   }
 
   // ==========================================================================
-  // MÓDULO 1: INTERFAZ DE "MI CAJA POKÉMON"
+  // MÓDULO 1: INTERFAZ DE "MI CAJA POKÉMON" Y BUSCADOR DE LUPA DE ESPECIES
   // ==========================================================================
   function initBoxForm() {
     const db = global.POKE_DB;
     const speciesSearchInput = document.getElementById("input-species-search");
+    const clearSpeciesBtn = document.getElementById("btn-clear-species-search");
+    const speciesDropdown = document.getElementById("species-search-dropdown");
+    const speciesMatchCount = document.getElementById("species-match-count");
     const speciesSelect = document.getElementById("select-box-species");
+
     const presetSelect = document.getElementById("select-level-preset");
     const customCpInput = document.getElementById("input-custom-cp");
     const ivAtkInput = document.getElementById("input-iv-atk");
@@ -78,7 +104,10 @@
     const maxClassSelect = document.getElementById("select-box-max-class");
     const form = document.getElementById("pokemon-box-form");
     const cancelEditBtn = document.getElementById("btn-cancel-edit");
+
     const filterBoxInput = document.getElementById("input-filter-box");
+    const clearBoxFilterBtn = document.getElementById("btn-clear-box-filter");
+    const boxTagBtns = document.querySelectorAll(".box-tag-btn");
     const clearBoxBtn = document.getElementById("btn-clear-box");
     const loadDemoBtn = document.getElementById("btn-load-demo-box");
 
@@ -90,34 +119,110 @@
       )
       .join("");
 
-    // Poblar selector de especies (excluyendo formas exclusivas de Jefe como Eternamax Boss)
-    function populateSpeciesOptions(filterText = "") {
-      const q = filterText.trim().toLowerCase();
-      const currentVal = speciesSelect.value;
-      const eligible = db.pokemon.filter((p) => {
+    // Filtrar especies elegibles según lo escrito en el buscador de lupa
+    function getFilteredBoxSpecies(filterText = "") {
+      const q = normalizeSearchText(filterText);
+      return db.pokemon.filter((p) => {
         if (p.bossOnly) return false;
         if (!q) return true;
-        const typeNames = p.types.map((t) => db.typeMeta[t].name.toLowerCase()).join(" ");
-        return (
-          p.name.toLowerCase().includes(q) ||
-          String(p.dex).includes(q) ||
-          typeNames.includes(q)
+        const typeNames = p.types.map((t) => db.typeMeta[t].name).join(" ");
+        const haystack = normalizeSearchText(
+          `${p.name} ${p.dex} #${p.dex} ${typeNames} ${p.roleTag || ""}`
         );
+        return haystack.includes(q);
       });
+    }
 
-      speciesSelect.innerHTML = eligible
-        .map(
-          (p) =>
-            `<option value="${p.id}">#${p.dex} ${p.name} (${p.types
-              .map((t) => db.typeMeta[t].name)
-              .join("/")})</option>`
-        )
+    function populateSpeciesOptions(filterText = "", showDropdown = false) {
+      const currentVal = speciesSelect.value;
+      const eligible = getFilteredBoxSpecies(filterText);
+
+      if (speciesMatchCount) {
+        speciesMatchCount.textContent =
+          eligible.length === db.pokemon.filter((p) => !p.bossOnly).length
+            ? `todas (${eligible.length})`
+            : `${eligible.length} coincidencia(s)`;
+      }
+
+      if (eligible.length > 0) {
+        speciesSelect.innerHTML = eligible
+          .map(
+            (p) =>
+              `<option value="${p.id}">#${p.dex} ${p.name} (${p.types
+                .map((t) => db.typeMeta[t].name)
+                .join("/")})</option>`
+          )
+          .join("");
+
+        if (currentVal && eligible.some((p) => p.id === currentVal)) {
+          speciesSelect.value = currentVal;
+        }
+        onSpeciesChange();
+      }
+
+      // Renderizar lista desplegable táctil si hay texto escrito o foco
+      if (showDropdown && filterText.trim().length > 0) {
+        renderSpeciesAutocompleteDropdown(eligible);
+      } else {
+        speciesDropdown.classList.add("hidden");
+      }
+    }
+
+    function renderSpeciesAutocompleteDropdown(matches) {
+      if (!matches || matches.length === 0) {
+        speciesDropdown.innerHTML = `
+          <div class="p-3 text-xs text-slate-400 text-center">
+            No se encontró ningún Pokémon con ese nombre o tipo.
+          </div>
+        `;
+        speciesDropdown.classList.remove("hidden");
+        return;
+      }
+
+      speciesDropdown.innerHTML = matches
+        .slice(0, 12)
+        .map((p) => {
+          const typesHtml = p.types.map((t) => renderTypeBadge(t)).join(" ");
+          const maxTag =
+            p.maxForm === "eternamax" || p.maxForm === "gigantamax"
+              ? `<span class="text-[10px] font-bold text-pink-400">🌀 G-Max</span>`
+              : p.maxCapable
+              ? `<span class="text-[10px] font-semibold text-indigo-300">⚡ D-Max</span>`
+              : "";
+          return `
+            <button
+              type="button"
+              data-pick-species="${p.id}"
+              class="w-full px-3.5 py-2.5 text-left hover:bg-cyan-500/15 active:bg-cyan-500/25 flex items-center justify-between gap-2 transition"
+            >
+              <div class="min-w-0">
+                <div class="flex items-center gap-1.5">
+                  <span class="font-mono text-[11px] text-slate-400">#${p.dex}</span>
+                  <span class="text-xs sm:text-sm font-bold text-white truncate">${p.name}</span>
+                  ${maxTag}
+                </div>
+                <p class="text-[10px] text-slate-400 truncate">${p.roleTag || ""}</p>
+              </div>
+              <div class="flex gap-1 shrink-0">${typesHtml}</div>
+            </button>
+          `;
+        })
         .join("");
 
-      if (currentVal && eligible.some((p) => p.id === currentVal)) {
-        speciesSelect.value = currentVal;
-      }
-      onSpeciesChange();
+      speciesDropdown.classList.remove("hidden");
+
+      speciesDropdown.querySelectorAll("[data-pick-species]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const pickedId = btn.getAttribute("data-pick-species");
+          const pickedSpecies = global.PokeBoxManager.getSpeciesById(pickedId);
+          speciesSearchInput.value = pickedSpecies ? pickedSpecies.name : "";
+          clearSpeciesBtn.classList.toggle("hidden", !speciesSearchInput.value);
+          populateSpeciesOptions("", false);
+          speciesSelect.value = pickedId;
+          onSpeciesChange();
+          speciesDropdown.classList.add("hidden");
+        });
+      });
     }
 
     // Actualizar ataques disponibles, estado Oscuro y clase Max cuando cambia la especie
@@ -148,13 +253,11 @@
         })
         .join("");
 
-      // Habilitar/deshabilitar checkbox de Oscuro según si la especie puede ser Oscura
       shadowCheckbox.disabled = !species.canBeShadow;
       if (!species.canBeShadow) {
         shadowCheckbox.checked = false;
       }
 
-      // Si no estamos editando un registro existente, preseleccionar su factor Max natural
       if (!state.editingUid) {
         if (species.maxCapable && species.maxForm) {
           maxClassSelect.value = species.maxForm;
@@ -216,9 +319,24 @@
       }
     }
 
-    // Eventos del formulario
+    // Eventos del buscador de especie con lupa
     speciesSearchInput.addEventListener("input", (e) => {
-      populateSpeciesOptions(e.target.value);
+      const val = e.target.value;
+      clearSpeciesBtn.classList.toggle("hidden", !val);
+      populateSpeciesOptions(val, true);
+    });
+
+    speciesSearchInput.addEventListener("focus", () => {
+      if (speciesSearchInput.value.trim().length > 0) {
+        populateSpeciesOptions(speciesSearchInput.value, true);
+      }
+    });
+
+    clearSpeciesBtn.addEventListener("click", () => {
+      speciesSearchInput.value = "";
+      clearSpeciesBtn.classList.add("hidden");
+      populateSpeciesOptions("", false);
+      speciesSearchInput.focus();
     });
 
     speciesSelect.addEventListener("change", onSpeciesChange);
@@ -270,9 +388,31 @@
       runOptimizerCalculation();
     });
 
+    // Eventos del buscador de lupa en Mi Colección Guardada
     filterBoxInput.addEventListener("input", (e) => {
-      state.boxFilterQuery = e.target.value.trim().toLowerCase();
+      state.boxFilterQuery = e.target.value;
+      clearBoxFilterBtn.classList.toggle("hidden", !state.boxFilterQuery);
       renderMyBoxCards();
+    });
+
+    clearBoxFilterBtn.addEventListener("click", () => {
+      filterBoxInput.value = "";
+      state.boxFilterQuery = "";
+      clearBoxFilterBtn.classList.add("hidden");
+      renderMyBoxCards();
+    });
+
+    boxTagBtns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.boxFilterTag = btn.getAttribute("data-box-tag");
+        boxTagBtns.forEach((b) => {
+          const active = b.getAttribute("data-box-tag") === state.boxFilterTag;
+          b.className = active
+            ? "box-tag-btn px-3 py-1 rounded-full text-xs font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0"
+            : "box-tag-btn px-3 py-1 rounded-full text-xs font-semibold bg-slate-950 text-slate-400 border border-slate-800 hover:text-cyan-300 shrink-0";
+        });
+        renderMyBoxCards();
+      });
     });
 
     clearBoxBtn.addEventListener("click", () => {
@@ -287,7 +427,7 @@
       runOptimizerCalculation();
     });
 
-    populateSpeciesOptions("");
+    populateSpeciesOptions("", false);
   }
 
   function resetBoxForm() {
@@ -296,6 +436,9 @@
     document.getElementById("box-form-title").textContent = "➕ Añadir Pokémon a Mi Caja";
     document.getElementById("btn-save-pokemon").textContent = "💾 Guardar en Mi Caja Pokémon";
     document.getElementById("btn-cancel-edit").classList.add("hidden");
+    document.getElementById("input-species-search").value = "";
+    document.getElementById("btn-clear-species-search").classList.add("hidden");
+    document.getElementById("species-search-dropdown").classList.add("hidden");
     document.getElementById("input-box-nickname").value = "";
     document.getElementById("input-custom-cp").value = "";
     document.getElementById("input-iv-atk").value = 15;
@@ -316,6 +459,7 @@
 
     const speciesSelect = document.getElementById("select-box-species");
     document.getElementById("input-species-search").value = "";
+    document.getElementById("btn-clear-species-search").classList.add("hidden");
     speciesSelect.value = entry.pokemonId;
     speciesSelect.dispatchEvent(new Event("change"));
 
@@ -351,27 +495,38 @@
     const db = global.POKE_DB;
     const allPokemon = global.PokeBoxManager.getAll();
 
-    // Actualizar contadores
     document.getElementById("header-box-count").textContent = allPokemon.length;
-    document.getElementById("tab-box-badge").textContent = allPokemon.length;
+    const tabBadge = document.getElementById("tab-box-badge");
+    if (tabBadge) tabBadge.textContent = allPokemon.length;
 
     const grid = document.getElementById("my-box-cards-grid");
-    const q = state.boxFilterQuery;
+    const q = normalizeSearchText(state.boxFilterQuery);
+
     const filtered = allPokemon.filter((item) => {
+      if (state.boxFilterTag === "max" && (!item.maxMoveInfo || !item.maxMoveInfo.isMaxCapable)) {
+        return false;
+      }
+      if (state.boxFilterTag === "shadow" && !item.isShadow) {
+        return false;
+      }
+      if (state.boxFilterTag === "hundo" && item.ivPct < 100) {
+        return false;
+      }
+
       if (!q) return true;
-      return (
-        item.nickname.toLowerCase().includes(q) ||
-        item.species.name.toLowerCase().includes(q) ||
-        item.fastMoveObj.name.toLowerCase().includes(q) ||
-        item.chargedMoveObj.name.toLowerCase().includes(q)
+      const typeNames = item.species.types.map((t) => db.typeMeta[t].name).join(" ");
+      const maxMoveName = item.maxMoveInfo ? item.maxMoveInfo.moveName : "";
+      const haystack = normalizeSearchText(
+        `${item.nickname} ${item.species.name} #${item.species.dex} ${typeNames} ${item.fastMoveObj.name} ${item.chargedMoveObj.name} ${maxMoveName}`
       );
+      return haystack.includes(q);
     });
 
     if (filtered.length === 0) {
       grid.innerHTML = `
-        <div class="col-span-full p-8 rounded-2xl bg-slate-950/80 border border-dashed border-slate-700 text-center space-y-2">
-          <p class="text-sm font-bold text-slate-300">No hay Pokémon en tu vista actual</p>
-          <p class="text-xs text-slate-400">Usa el formulario de la izquierda para añadir tus Pokémon o pulsa <strong>"⚡ Cargar Caja Demo"</strong> en la barra superior.</p>
+        <div class="col-span-full p-6 sm:p-8 rounded-2xl bg-slate-950/80 border border-dashed border-slate-700 text-center space-y-2">
+          <p class="text-sm font-bold text-slate-300">No se encontraron Pokémon en tu caja</p>
+          <p class="text-xs text-slate-400">Prueba con otro término en el buscador o pulsa <strong>"⚡ Demo"</strong> arriba a la derecha.</p>
         </div>
       `;
       return;
@@ -393,7 +548,7 @@
               ? "Gigamax"
               : "Dinamax";
           maxBadge = `
-            <div class="mt-2 p-2 rounded-lg bg-pink-950/50 border border-pink-500/40 flex items-center justify-between text-[11px]">
+            <div class="mt-2 p-2 rounded-lg bg-pink-950/50 border border-pink-500/40 flex flex-wrap items-center justify-between gap-1 text-[11px]">
               <span class="font-bold text-pink-300">🌀 ${labelClass}: ${item.maxMoveInfo.moveName}</span>
               <span class="font-mono text-pink-200">ATQ ${item.maxMoveInfo.atkLevel} · GRD ${item.maxMoveInfo.guardLevel} · ESP ${item.maxMoveInfo.spiritLevel}</span>
             </div>
@@ -401,20 +556,20 @@
         }
 
         return `
-          <article class="p-4 rounded-xl bg-slate-950/90 border border-slate-800 hover:border-cyan-500/50 transition flex flex-col justify-between shadow-lg ${
+          <article class="p-3.5 sm:p-4 rounded-xl bg-slate-950/90 border border-slate-800 hover:border-cyan-500/50 transition flex flex-col justify-between shadow-lg ${
             item.isShadow ? "glow-shadow-poke" : item.maxMoveInfo.isMaxCapable ? "glow-dynamax" : ""
           }">
             <div>
               <div class="flex items-start justify-between gap-2">
-                <div>
-                  <div class="flex items-center gap-1.5">
+                <div class="min-w-0">
+                  <div class="flex items-center gap-1.5 flex-wrap">
                     <span class="font-mono text-[11px] text-slate-400">#${item.species.dex}</span>
                     <span class="px-2 py-0.5 rounded-full font-mono text-[11px] font-extrabold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">PC ${item.cp}</span>
                     <span class="font-mono text-[11px] text-slate-400">${item.levelBadge}</span>
                   </div>
-                  <h3 class="text-sm sm:text-base font-extrabold text-white mt-1">${item.nickname}</h3>
+                  <h3 class="text-sm sm:text-base font-extrabold text-white mt-1 truncate">${item.nickname}</h3>
                 </div>
-                <div class="flex flex-wrap gap-1 justify-end">
+                <div class="flex flex-wrap gap-1 justify-end shrink-0">
                   ${typeBadges}
                   ${shadowBadge}
                 </div>
@@ -430,13 +585,13 @@
 
               <!-- Movimientos -->
               <div class="mt-2.5 space-y-1 text-xs">
-                <div class="flex items-center justify-between">
+                <div class="flex items-center justify-between gap-1">
                   <span class="text-slate-400">Rápido:</span>
-                  <span class="font-semibold text-slate-200">${item.fastMoveObj.name} ${renderTypeBadge(item.fastMoveObj.type)}</span>
+                  <span class="font-semibold text-slate-200 text-right">${item.fastMoveObj.name} ${renderTypeBadge(item.fastMoveObj.type)}</span>
                 </div>
-                <div class="flex items-center justify-between">
+                <div class="flex items-center justify-between gap-1">
                   <span class="text-slate-400">Cargado:</span>
-                  <span class="font-semibold text-slate-200">${item.chargedMoveObj.name} ${renderTypeBadge(item.chargedMoveObj.type)}</span>
+                  <span class="font-semibold text-slate-200 text-right">${item.chargedMoveObj.name} ${renderTypeBadge(item.chargedMoveObj.type)}</span>
                 </div>
               </div>
 
@@ -449,7 +604,7 @@
                 type="button"
                 data-action="edit-box"
                 data-uid="${item.uid}"
-                class="px-3 py-1 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-cyan-600/30 text-cyan-300 border border-slate-700 hover:border-cyan-500/50 transition"
+                class="min-h-[36px] px-3 py-1 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-cyan-600/30 text-cyan-300 border border-slate-700 hover:border-cyan-500/50 transition"
               >
                 ✏️ Editar
               </button>
@@ -457,7 +612,7 @@
                 type="button"
                 data-action="delete-box"
                 data-uid="${item.uid}"
-                class="px-3 py-1 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-rose-600/30 text-rose-300 border border-slate-700 hover:border-rose-500/50 transition"
+                class="min-h-[36px] px-3 py-1 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-rose-600/30 text-rose-300 border border-slate-700 hover:border-rose-500/50 transition"
               >
                 🗑️ Borrar
               </button>
@@ -467,7 +622,6 @@
       })
       .join("");
 
-    // Eventos delegados de Editar y Borrar
     grid.querySelectorAll("[data-action='edit-box']").forEach((btn) => {
       btn.addEventListener("click", () => {
         loadPokemonIntoEditForm(btn.getAttribute("data-uid"));
@@ -485,11 +639,15 @@
   }
 
   // ==========================================================================
-  // MÓDULO 2 Y 3: SELECTOR DE JEFE, CONDICIONES Y MOTOR DE RECOMENDACIÓN
+  // MÓDULO 2 Y 3: BUSCADOR DE LUPA DE JEFE, CONDICIONES Y MOTOR DE RECOMENDACIÓN
   // ==========================================================================
   function initOptimizerControls() {
     const db = global.POKE_DB;
     const modeSelect = document.getElementById("select-battle-mode");
+    const bossSearchInput = document.getElementById("input-boss-search");
+    const clearBossSearchBtn = document.getElementById("btn-clear-boss-search");
+    const bossDropdown = document.getElementById("boss-search-dropdown");
+    const bossQuickChips = document.getElementById("boss-quick-chips");
     const bossSelect = document.getElementById("select-boss-pokemon");
     const bossFastSelect = document.getElementById("select-boss-fast");
     const bossChargedSelect = document.getElementById("select-boss-charged");
@@ -499,6 +657,8 @@
     const megaSelect = document.getElementById("select-mega-bonus");
     const weatherToggle = document.getElementById("toggle-weather-boost");
     const runBtn = document.getElementById("btn-run-optimizer");
+
+    const bossCandidates = db.pokemon.filter((p) => p.isBossCandidate);
 
     // Poblar modos de combate
     modeSelect.innerHTML = Object.values(db.battleModes)
@@ -510,16 +670,157 @@
       )
       .join("");
 
-    // Poblar jefes disponibles
-    const bossCandidates = db.pokemon.filter((p) => p.isBossCandidate);
-    bossSelect.innerHTML = bossCandidates
-      .map(
-        (p) =>
-          `<option value="${p.id}" ${
-            p.id === state.selectedBossId ? "selected" : ""
-          }>#${p.dex} ${p.name} (${p.types.map((t) => db.typeMeta[t].name).join("/")})</option>`
-      )
-      .join("");
+    // Poblar selector nativo de jefes
+    function populateBossSelectOptions(list = bossCandidates) {
+      bossSelect.innerHTML = list
+        .map(
+          (p) =>
+            `<option value="${p.id}" ${
+              p.id === state.selectedBossId ? "selected" : ""
+            }>#${p.dex} ${p.name} (${p.types.map((t) => db.typeMeta[t].name).join("/")})</option>`
+        )
+        .join("");
+    }
+
+    // Chips rápidos táctiles para elegir los jefes más buscados con 1 toque en móvil
+    const featuredBossIds = [
+      "eternatus",
+      "duraludon_gmax",
+      "eternatus_eternamax",
+      "groudon_primal",
+      "rayquaza_mega",
+      "rillaboom_gmax",
+      "gengar_gmax",
+      "mewtwo"
+    ];
+
+    function renderBossQuickChips() {
+      if (!bossQuickChips) return;
+      bossQuickChips.innerHTML = featuredBossIds
+        .map((id) => db.pokemon.find((p) => p.id === id))
+        .filter(Boolean)
+        .map((p) => {
+          const isSelected = p.id === state.selectedBossId;
+          return `
+            <button
+              type="button"
+              data-quick-boss="${p.id}"
+              class="px-2.5 py-1 rounded-full text-[11px] font-bold whitespace-nowrap transition shrink-0 border ${
+                isSelected
+                  ? "bg-cyan-500/25 text-cyan-200 border-cyan-400 shadow-sm"
+                  : "bg-slate-950 text-slate-400 border-slate-800 hover:text-slate-200"
+              }"
+            >
+              ${p.name}
+            </button>
+          `;
+        })
+        .join("");
+
+      bossQuickChips.querySelectorAll("[data-quick-boss]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          selectBossById(btn.getAttribute("data-quick-boss"));
+        });
+      });
+    }
+
+    function selectBossById(bossId) {
+      const boss = db.pokemon.find((p) => p.id === bossId);
+      if (!boss) return;
+
+      state.selectedBossId = boss.id;
+      populateBossSelectOptions(bossCandidates);
+      bossSelect.value = boss.id;
+
+      // Sugerir modo por defecto del jefe si aplica
+      if (Array.isArray(boss.defaultBossModes) && boss.defaultBossModes.length > 0) {
+        if (!boss.defaultBossModes.includes(state.selectedBattleModeId)) {
+          state.selectedBattleModeId = boss.defaultBossModes[0];
+          modeSelect.value = state.selectedBattleModeId;
+        }
+      }
+
+      bossDropdown.classList.add("hidden");
+      renderBossQuickChips();
+      populateBossMoves();
+      runOptimizerCalculation();
+    }
+
+    // Búsqueda instantánea con lupa para el Jefe
+    bossSearchInput.addEventListener("input", (e) => {
+      const val = e.target.value;
+      clearBossSearchBtn.classList.toggle("hidden", !val);
+      const q = normalizeSearchText(val);
+
+      if (!q) {
+        populateBossSelectOptions(bossCandidates);
+        bossDropdown.classList.add("hidden");
+        return;
+      }
+
+      const matches = bossCandidates.filter((p) => {
+        const typeNames = p.types.map((t) => db.typeMeta[t].name).join(" ");
+        const haystack = normalizeSearchText(
+          `${p.name} ${p.dex} #${p.dex} ${typeNames} ${p.roleTag || ""}`
+        );
+        return haystack.includes(q);
+      });
+
+      if (matches.length > 0) {
+        populateBossSelectOptions(matches);
+      }
+
+      if (matches.length === 0) {
+        bossDropdown.innerHTML = `
+          <div class="p-3 text-xs text-slate-400 text-center">
+            No se encontró ningún Jefe con "${val}".
+          </div>
+        `;
+      } else {
+        bossDropdown.innerHTML = matches
+          .slice(0, 10)
+          .map((p) => {
+            const typesHtml = p.types.map((t) => renderTypeBadge(t)).join(" ");
+            return `
+              <button
+                type="button"
+                data-pick-boss="${p.id}"
+                class="w-full px-3.5 py-2.5 text-left hover:bg-cyan-500/15 active:bg-cyan-500/25 flex items-center justify-between gap-2 transition"
+              >
+                <div class="min-w-0">
+                  <div class="flex items-center gap-1.5">
+                    <span class="font-mono text-[11px] text-slate-400">#${p.dex}</span>
+                    <span class="text-xs sm:text-sm font-bold text-white truncate">${p.name}</span>
+                  </div>
+                  <p class="text-[10px] text-slate-400 truncate">${p.roleTag || ""}</p>
+                </div>
+                <div class="flex gap-1 shrink-0">${typesHtml}</div>
+              </button>
+            `;
+          })
+          .join("");
+      }
+
+      bossDropdown.classList.remove("hidden");
+
+      bossDropdown.querySelectorAll("[data-pick-boss]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const pickedId = btn.getAttribute("data-pick-boss");
+          const pickedBoss = db.pokemon.find((p) => p.id === pickedId);
+          bossSearchInput.value = pickedBoss ? pickedBoss.name : "";
+          clearBossSearchBtn.classList.toggle("hidden", !bossSearchInput.value);
+          selectBossById(pickedId);
+        });
+      });
+    });
+
+    clearBossSearchBtn.addEventListener("click", () => {
+      bossSearchInput.value = "";
+      clearBossSearchBtn.classList.add("hidden");
+      bossDropdown.classList.add("hidden");
+      populateBossSelectOptions(bossCandidates);
+      bossSearchInput.focus();
+    });
 
     function populateBossMoves() {
       const boss = db.pokemon.find((p) => p.id === state.selectedBossId) || bossCandidates[0];
@@ -547,17 +848,7 @@
     });
 
     bossSelect.addEventListener("change", () => {
-      state.selectedBossId = bossSelect.value;
-      const boss = db.pokemon.find((p) => p.id === state.selectedBossId);
-      // Si el jefe tiene un modo por defecto (ej. Duraludon Gigamax -> Gigamax Nv. 6), sugerirlo automáticamente
-      if (boss && Array.isArray(boss.defaultBossModes) && boss.defaultBossModes.length > 0) {
-        if (!boss.defaultBossModes.includes(state.selectedBattleModeId)) {
-          state.selectedBattleModeId = boss.defaultBossModes[0];
-          modeSelect.value = state.selectedBattleModeId;
-        }
-      }
-      populateBossMoves();
-      runOptimizerCalculation();
+      selectBossById(bossSelect.value);
     });
 
     bossFastSelect.addEventListener("change", () => {
@@ -584,8 +875,8 @@
         partySizeBtns.forEach((b) => {
           const active = Number(b.getAttribute("data-party-size")) === state.partySize;
           b.className = active
-            ? "party-size-btn py-1.5 px-2 rounded-lg text-xs font-bold border border-indigo-500/50 bg-indigo-600/30 text-white"
-            : "party-size-btn py-1.5 px-2 rounded-lg text-xs font-semibold border border-slate-700 bg-slate-900 text-slate-300 hover:border-indigo-400";
+            ? "party-size-btn min-h-[40px] py-1.5 px-2 rounded-lg text-xs font-bold border border-indigo-500/50 bg-indigo-600/30 text-white"
+            : "party-size-btn min-h-[40px] py-1.5 px-2 rounded-lg text-xs font-semibold border border-slate-700 bg-slate-900 text-slate-300 hover:border-indigo-400";
         });
         runOptimizerCalculation();
       });
@@ -610,6 +901,23 @@
       runOptimizerCalculation();
     });
 
+    // Cerrar desplegables de autocompletado al tocar fuera
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest("#input-boss-search") && !e.target.closest("#boss-search-dropdown")) {
+        bossDropdown.classList.add("hidden");
+      }
+      const speciesDropdown = document.getElementById("species-search-dropdown");
+      if (
+        speciesDropdown &&
+        !e.target.closest("#input-species-search") &&
+        !e.target.closest("#species-search-dropdown")
+      ) {
+        speciesDropdown.classList.add("hidden");
+      }
+    });
+
+    populateBossSelectOptions(bossCandidates);
+    renderBossQuickChips();
     populateBossMoves();
   }
 
@@ -643,14 +951,13 @@
     if (battleMode.category === "max") {
       catPill.textContent = "COMBATE MAX (3 POKÉMON)";
       catPill.className =
-        "px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold uppercase bg-pink-500/25 text-pink-300 border border-pink-500/50";
+        "px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono font-bold uppercase bg-pink-500/25 text-pink-300 border border-pink-500/50 shrink-0";
     } else {
       catPill.textContent = "INCURSIÓN (6 POKÉMON)";
       catPill.className =
-        "px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold uppercase bg-cyan-500/20 text-cyan-300 border border-cyan-500/40";
+        "px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono font-bold uppercase bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0";
     }
 
-    // Mostrar/deshabilitar contenedor de Party Power si es Combate Max
     const partyContainer = document.getElementById("party-power-container");
     partyContainer.classList.toggle("opacity-50", !battleMode.allowPartyPower);
 
@@ -664,8 +971,8 @@
     document.getElementById("boss-time-display").textContent = `${bossProfile.timeLimitSec}s`;
     document.getElementById("boss-teamsize-display").textContent =
       battleMode.category === "max"
-        ? `3 Max (Patrulla de ${battleMode.squadSize || 4})`
-        : `6 Pokémon (Máx ${battleMode.maxLobbyPlayers})`;
+        ? `3 Max (Patrulla ${battleMode.squadSize || 4})`
+        : `6 Raid (Máx ${battleMode.maxLobbyPlayers})`;
 
     const weakContainer = document.getElementById("boss-weaknesses-list");
     weakContainer.innerHTML = bossProfile.weaknesses
@@ -676,7 +983,7 @@
           } ${w.meta.text} ${w.meta.border}">
             <span>${w.name}</span>
             <strong class="font-mono ${
-              w.isDoubleWeakness ? "text-amber-300 underline" : " opacity-90"
+              w.isDoubleWeakness ? "text-amber-300 underline" : "opacity-90"
             }">x${w.multiplier}</strong>
           </span>`
       )
@@ -686,23 +993,21 @@
   function renderCalculationResults(plan) {
     const { personalMetrics, scenarios, team, battleMode, bossProfile, missingMaxWarning } = plan;
 
-    // 1. Badge de veredicto
     const verdictBadge = document.getElementById("verdict-badge");
     if (personalMetrics.canSolo) {
       verdictBadge.textContent = "🏆 ¡SOLABLE EN SOLITARIO!";
       verdictBadge.className =
-        "px-3.5 py-1.5 rounded-xl font-mono text-xs font-bold uppercase tracking-wider bg-emerald-500/25 text-emerald-300 border border-emerald-500/50";
+        "px-3 py-1.5 rounded-xl font-mono text-[11px] sm:text-xs font-bold uppercase tracking-wider bg-emerald-500/25 text-emerald-300 border border-emerald-500/50";
     } else if (scenarios.standard.count <= 2) {
       verdictBadge.textContent = `✅ DÚO / TRÍO ASEQUIBLE (+${scenarios.hardcore.count} a +${scenarios.standard.count})`;
       verdictBadge.className =
-        "px-3.5 py-1.5 rounded-xl font-mono text-xs font-bold uppercase tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-500/40";
+        "px-3 py-1.5 rounded-xl font-mono text-[11px] sm:text-xs font-bold uppercase tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-500/40";
     } else {
-      verdictBadge.textContent = `⚔️ REQUIERE PATRULLA / GRUPO (+${scenarios.hardcore.count} Hardcore)`;
+      verdictBadge.textContent = `⚔️ REQUIERE GRUPO (+${scenarios.hardcore.count} Hardcore)`;
       verdictBadge.className =
-        "px-3.5 py-1.5 rounded-xl font-mono text-xs font-bold uppercase tracking-wider bg-pink-500/25 text-pink-300 border border-pink-500/50";
+        "px-3 py-1.5 rounded-xl font-mono text-[11px] sm:text-xs font-bold uppercase tracking-wider bg-pink-500/25 text-pink-300 border border-pink-500/50";
     }
 
-    // 2. Barra y porcentaje de contribución de daño
     document.getElementById("personal-damage-pct").textContent = `${personalMetrics.personalDamagePct}%`;
     document.getElementById("personal-damage-raw").textContent = `(${personalMetrics.personalDamage.toLocaleString()} / ${bossProfile.hp.toLocaleString()} HP)`;
     document.getElementById("personal-damage-bar").style.width = `${Math.min(
@@ -714,10 +1019,8 @@
     document.getElementById("metric-team-tdo").textContent = `${personalMetrics.teamTDO.toLocaleString()} HP`;
     document.getElementById("metric-active-mult").textContent = `x${personalMetrics.activeMultiplier}`;
 
-    // 3. Frase directa de recomendación
     document.getElementById("direct-recommendation-text").textContent = plan.directRecommendation;
 
-    // 4. Tres escenarios (Hardcore, Estándar, Casual)
     document.getElementById("scenario-hardcore-count").textContent =
       scenarios.hardcore.count === 0 ? "0 (Solo)" : `+${scenarios.hardcore.count} jug.`;
     document.getElementById("scenario-standard-count").textContent =
@@ -725,7 +1028,6 @@
     document.getElementById("scenario-casual-count").textContent =
       scenarios.casual.count === 0 ? "0 (Solo)" : `+${scenarios.casual.count}+ jug.`;
 
-    // 5. Título y Banner del Equipo Ideal Recomendado
     const teamTitle = document.getElementById("recommended-team-title");
     const teamSubtitle = document.getElementById("recommended-team-subtitle");
     const maxBanner = document.getElementById("max-strategy-banner");
@@ -743,7 +1045,6 @@
       maxBanner.classList.add("hidden");
     }
 
-    // 6. Renderizar tarjetas del Equipo Ideal
     const teamGrid = document.getElementById("recommended-team-grid");
     if (team.length === 0) {
       teamGrid.innerHTML = `
@@ -759,7 +1060,7 @@
         const entry = item.boxEntry;
         const effBadge =
           item.bestTypeEff >= 2.5
-            ? `<span class="px-2 py-0.5 rounded font-mono text-[10px] font-extrabold bg-amber-500/25 text-amber-300 border border-amber-500/50">Doble Eficacia x${item.bestTypeEff}</span>`
+            ? `<span class="px-2 py-0.5 rounded font-mono text-[10px] font-extrabold bg-amber-500/25 text-amber-300 border border-amber-500/50">Doble x${item.bestTypeEff}</span>`
             : item.bestTypeEff > 1.0
             ? `<span class="px-2 py-0.5 rounded font-mono text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">Eficaz x${item.bestTypeEff}</span>`
             : `<span class="px-2 py-0.5 rounded font-mono text-[10px] bg-slate-800 text-slate-300">Neutro x${item.bestTypeEff}</span>`;
@@ -773,21 +1074,21 @@
             : "";
 
         return `
-          <div class="p-4 rounded-xl bg-slate-950/90 border border-slate-800 hover:border-pink-500/50 transition flex flex-col justify-between">
+          <div class="p-3.5 sm:p-4 rounded-xl bg-slate-950/90 border border-slate-800 hover:border-pink-500/50 transition flex flex-col justify-between">
             <div>
               <div class="flex items-center justify-between gap-2 mb-2">
-                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${item.roleBadgeClass}">
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border truncate ${item.roleBadgeClass}">
                   ${item.roleLabel}
                 </span>
                 ${effBadge}
               </div>
 
-              <div class="flex items-baseline justify-between">
-                <h4 class="text-sm sm:text-base font-extrabold text-white">
+              <div class="flex items-baseline justify-between gap-2">
+                <h4 class="text-sm sm:text-base font-extrabold text-white truncate">
                   ${entry.nickname}
                   ${entry.isShadow ? '<span class="text-purple-400 text-xs">(Oscuro)</span>' : ""}
                 </h4>
-                <span class="font-mono text-xs font-bold text-cyan-300">PC ${entry.cp} · ${entry.levelBadge}</span>
+                <span class="font-mono text-xs font-bold text-cyan-300 shrink-0">PC ${entry.cp} · ${entry.levelBadge}</span>
               </div>
 
               <div class="mt-2 space-y-1 text-xs text-slate-300">
@@ -825,16 +1126,94 @@
   }
 
   // ==========================================================================
-  // CATÁLOGO POKÉDEX META (VISTA 3)
+  // CATÁLOGO POKÉDEX META CON BUSCADOR DE LUPA Y ACCIÓN RÁPIDA (VISTA 3)
   // ==========================================================================
+  function initPokedexSearch() {
+    const searchInput = document.getElementById("input-pokedex-search");
+    const clearBtn = document.getElementById("btn-clear-pokedex-search");
+    const filterBtns = document.querySelectorAll(".dex-filter-btn");
+
+    if (searchInput) {
+      searchInput.addEventListener("input", (e) => {
+        state.dexFilterQuery = e.target.value;
+        clearBtn.classList.toggle("hidden", !state.dexFilterQuery);
+        renderPokedexCatalog();
+      });
+    }
+
+    if (clearBtn) {
+      clearBtn.addEventListener("click", () => {
+        searchInput.value = "";
+        state.dexFilterQuery = "";
+        clearBtn.classList.add("hidden");
+        renderPokedexCatalog();
+      });
+    }
+
+    filterBtns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.dexFilterTag = btn.getAttribute("data-dex-filter");
+        filterBtns.forEach((b) => {
+          const active = b.getAttribute("data-dex-filter") === state.dexFilterTag;
+          b.className = active
+            ? "dex-filter-btn px-3 py-1 rounded-full text-xs font-bold bg-pink-500/20 text-pink-300 border border-pink-500/40 shrink-0"
+            : "dex-filter-btn px-3 py-1 rounded-full text-xs font-semibold bg-slate-950 text-slate-400 border border-slate-800 hover:text-pink-300 shrink-0";
+        });
+        renderPokedexCatalog();
+      });
+    });
+
+    renderPokedexCatalog();
+  }
+
   function renderPokedexCatalog() {
     const db = global.POKE_DB;
     const catalogGrid = document.getElementById("pokedex-catalog-grid");
     const badgeTotal = document.getElementById("db-total-species-badge");
-    if (badgeTotal) badgeTotal.textContent = `${db.pokemon.length} Especies Cargadas`;
     if (!catalogGrid) return;
 
-    catalogGrid.innerHTML = db.pokemon
+    const q = normalizeSearchText(state.dexFilterQuery);
+    const filtered = db.pokemon.filter((p) => {
+      if (
+        state.dexFilterTag === "gmax" &&
+        p.maxForm !== "gigantamax" &&
+        p.maxForm !== "eternamax"
+      ) {
+        return false;
+      }
+      if (state.dexFilterTag === "dmax" && p.maxForm !== "dynamax") {
+        return false;
+      }
+      if (state.dexFilterTag === "mega" && !p.isMega) {
+        return false;
+      }
+
+      if (!q) return true;
+      const typeNames = p.types.map((t) => db.typeMeta[t].name).join(" ");
+      const gmaxMoveName =
+        p.fixedGmaxMove && db.gmaxMoves[p.fixedGmaxMove]
+          ? db.gmaxMoves[p.fixedGmaxMove].name
+          : "";
+      const haystack = normalizeSearchText(
+        `${p.name} #${p.dex} ${typeNames} ${p.roleTag || ""} ${p.notes || ""} ${gmaxMoveName}`
+      );
+      return haystack.includes(q);
+    });
+
+    if (badgeTotal) {
+      badgeTotal.textContent = `${filtered.length} / ${db.pokemon.length} Especies`;
+    }
+
+    if (filtered.length === 0) {
+      catalogGrid.innerHTML = `
+        <div class="col-span-full p-8 rounded-2xl bg-slate-950/80 border border-dashed border-slate-700 text-center text-xs text-slate-400">
+          No hay ningún Pokémon en la Base de Datos que coincida con tu búsqueda.
+        </div>
+      `;
+      return;
+    }
+
+    catalogGrid.innerHTML = filtered
       .map((p) => {
         const typeBadges = p.types.map((t) => renderTypeBadge(t)).join(" ");
         const gmaxInfo =
@@ -843,6 +1222,16 @@
             : p.maxCapable
             ? `<div class="mt-2 px-2.5 py-1 rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-[11px] text-indigo-300">⚡ Apto para Combates Dinamax</div>`
             : "";
+
+        const quickAddBtn = !p.bossOnly
+          ? `<button
+              type="button"
+              data-quick-add-box="${p.id}"
+              class="mt-3 w-full py-1.5 px-3 rounded-lg text-xs font-bold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 transition"
+            >
+              ➕ Enviar al Formulario de Mi Caja
+            </button>`
+          : "";
 
         return `
           <article class="p-4 rounded-xl bg-slate-950/90 border border-slate-800 hover:border-cyan-500/50 transition flex flex-col justify-between">
@@ -858,15 +1247,30 @@
               <p class="mt-1 text-xs text-slate-400 leading-relaxed">${p.notes || ""}</p>
               ${gmaxInfo}
             </div>
-            <div class="mt-3 pt-2.5 border-t border-slate-800/80 grid grid-cols-3 text-center font-mono text-xs">
-              <div><span class="text-[10px] text-slate-500 block">ATQ</span><strong class="text-rose-400">${p.baseStats.atk}</strong></div>
-              <div><span class="text-[10px] text-slate-500 block">DEF</span><strong class="text-cyan-400">${p.baseStats.def}</strong></div>
-              <div><span class="text-[10px] text-slate-500 block">PS</span><strong class="text-emerald-400">${p.baseStats.sta}</strong></div>
+            <div>
+              <div class="mt-3 pt-2.5 border-t border-slate-800/80 grid grid-cols-3 text-center font-mono text-xs">
+                <div><span class="text-[10px] text-slate-500 block">ATQ</span><strong class="text-rose-400">${p.baseStats.atk}</strong></div>
+                <div><span class="text-[10px] text-slate-500 block">DEF</span><strong class="text-cyan-400">${p.baseStats.def}</strong></div>
+                <div><span class="text-[10px] text-slate-500 block">PS</span><strong class="text-emerald-400">${p.baseStats.sta}</strong></div>
+              </div>
+              ${quickAddBtn}
             </div>
           </article>
         `;
       })
       .join("");
+
+    catalogGrid.querySelectorAll("[data-quick-add-box]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const speciesId = btn.getAttribute("data-quick-add-box");
+        resetBoxForm();
+        const speciesSelect = document.getElementById("select-box-species");
+        speciesSelect.value = speciesId;
+        speciesSelect.dispatchEvent(new Event("change"));
+        switchTab("tab-box");
+        document.getElementById("pokemon-box-form").scrollIntoView({ behavior: "smooth" });
+      });
+    });
   }
 
   // Inicialización al cargar el DOM
@@ -875,8 +1279,8 @@
     initTabs();
     initBoxForm();
     initOptimizerControls();
+    initPokedexSearch();
     renderMyBoxCards();
-    renderPokedexCatalog();
     runOptimizerCalculation();
   });
 })(typeof window !== "undefined" ? window : globalThis);
