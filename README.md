@@ -15,6 +15,11 @@ Aplicación web interactiva para **Pokémon GO** que gestiona tu **Caja de Poké
   - **Backup JSON y Ordenación**: Ordena por PC, IV%, Nivel o Pokédex, y exporta/importa copias de seguridad en `.json`.
 
 - **Módulo 2 y 3: Motor Matemático PvE y Simulación Co-op (`js/engine.js` & `js/app.js`):**
+  - **4 Modalidades PvE con Reglas y Capacidades Oficiales**:
+    - **⚔️ Raids (Nv. 1, 3, 5, Oscuras, Élite)**: **6 Pokémon/jugador** (máx. 1 Mega/Primigenio por equipo, permite re-lobby) · **Sala máx. 20 jugadores**.
+    - **🧬 Mega Raids (Mega y Mega Legendaria / Primigenia)**: **6 Pokémon/jugador** (máx. 1 Mega/Primigenio por equipo, permite re-lobby) · **Sala máx. 20 jugadores**.
+    - **⚡ Combates Dinamax (Nv. 1 a Nv. 5)**: **3 Pokémon Max/jugador** (sin Megas, sin re-lobby, sin Party Power) · **Sala máx. 4 jugadores** (1 patrulla).
+    - **🌀 Combates Gigamax (Nv. 6)**: **3 Pokémon Max/jugador** (sin Megas, sin re-lobby, sin Party Power) · **Sala máx. 40 jugadores** (hasta 10 patrullas de 4).
   - Fórmula oficial de daño de Pokémon GO con `CPM`, `STAB (1.2x)`, debilidades elementales (`1.6x` y `2.56x`), Amistad, Clima, Mega activa y **Juego en Equipo (Party Power de 2, 3 o 4 jugadores)**.
   - **Compañeros Random por Nivel**: Añade jugadores desconocidos que entren a la sala categorizándolos en **Nivel Alto (Nv. 40-50)**, **Nivel Medio (Nv. 30-39)** o **Nivel Bajo (Nv. 20-29)** para sumar su daño estimado al grupo.
   - **Simulación Co-op Real**: Combina tu equipo + equipos de amigos fijos + compañeros random en tiempo real.

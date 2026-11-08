@@ -47,6 +47,85 @@
     return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${tm.bg} ${tm.text} ${tm.border} ${extraClasses}">${tm.name}</span>`;
   }
 
+  function showNotification(message, type = "info") {
+    let toast = document.getElementById("app-toast-notification");
+    if (!toast) {
+      toast = document.createElement("div");
+      toast.id = "app-toast-notification";
+      toast.className =
+        "fixed bottom-20 sm:bottom-6 right-4 z-50 max-w-sm px-4 py-3 rounded-xl shadow-2xl border text-xs sm:text-sm font-bold transition-all duration-300 pointer-events-none";
+      document.body.appendChild(toast);
+    }
+    const colorClasses =
+      type === "error"
+        ? "bg-rose-950/95 border-rose-500/70 text-rose-200"
+        : type === "warning"
+        ? "bg-amber-950/95 border-amber-500/70 text-amber-200"
+        : "bg-slate-900/95 border-cyan-400/70 text-cyan-200";
+    toast.className = `fixed bottom-20 sm:bottom-6 right-4 z-50 max-w-sm px-4 py-3 rounded-xl shadow-2xl border text-xs sm:text-sm font-bold transition-all duration-300 ${colorClasses}`;
+    toast.textContent = message;
+    toast.style.opacity = "1";
+    clearTimeout(toast._hideTimer);
+    toast._hideTimer = setTimeout(() => {
+      toast.style.opacity = "0";
+    }, 3200);
+  }
+
+  function getActiveBattleMode() {
+    const db = global.POKE_DB;
+    return db.battleModes[state.selectedBattleModeId] || db.battleModes.raid_t5;
+  }
+
+  function clampAlliesToLobbyLimit(battleMode = getActiveBattleMode()) {
+    const maxCompanions = Math.max(0, (battleMode.maxLobbyPlayers || 20) - 1);
+
+    // 1. Recortar amigos fijos si exceden el límite de sala (ej. Dinamax máx 3 acompañantes)
+    if (state.activeCombatFriendIds.length > maxCompanions) {
+      state.activeCombatFriendIds = state.activeCombatFriendIds.slice(0, maxCompanions);
+    }
+
+    // 2. Recortar compañeros random si la suma (Amigos + Randoms) supera maxCompanions
+    let remainingSlots = Math.max(0, maxCompanions - state.activeCombatFriendIds.length);
+
+    state.randomAlliesHigh = Math.max(0, Math.min(state.randomAlliesHigh || 0, remainingSlots));
+    remainingSlots -= state.randomAlliesHigh;
+
+    state.randomAlliesMid = Math.max(0, Math.min(state.randomAlliesMid || 0, remainingSlots));
+    remainingSlots -= state.randomAlliesMid;
+
+    state.randomAlliesLow = Math.max(0, Math.min(state.randomAlliesLow || 0, remainingSlots));
+
+    syncLobbyOccupancyUI(battleMode);
+  }
+
+  function syncLobbyOccupancyUI(battleMode = getActiveBattleMode()) {
+    const elHigh = document.getElementById("label-random-allies-high");
+    const elMid = document.getElementById("label-random-allies-mid");
+    const elLow = document.getElementById("label-random-allies-low");
+    if (elHigh) elHigh.textContent = state.randomAlliesHigh;
+    if (elMid) elMid.textContent = state.randomAlliesMid;
+    if (elLow) elLow.textContent = state.randomAlliesLow;
+
+    const totalRandom = state.randomAlliesHigh + state.randomAlliesMid + state.randomAlliesLow;
+    const summaryWrap = document.getElementById("random-allies-summary");
+    const countTotal = document.getElementById("random-allies-count-total");
+    if (summaryWrap && countTotal) {
+      summaryWrap.classList.toggle("hidden", totalRandom <= 0);
+      countTotal.textContent = totalRandom;
+    }
+
+    const totalPlayersInLobby = 1 + state.activeCombatFriendIds.length + totalRandom;
+    const maxLobby = battleMode.maxLobbyPlayers || 20;
+    const occBadge = document.getElementById("lobby-occupancy-badge");
+    if (occBadge) {
+      occBadge.textContent = `Sala: ${totalPlayersInLobby} / ${maxLobby} Jug.`;
+      occBadge.className =
+        totalPlayersInLobby >= maxLobby
+          ? "px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/25 text-amber-300 border border-amber-500/50 shrink-0"
+          : "px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0";
+    }
+  }
+
   // ==========================================================================
   // NAVEGACIÓN POR PESTAÑAS
   // ==========================================================================
@@ -171,15 +250,32 @@
       .join("");
 
     container.querySelectorAll("[data-combat-friend-id]").forEach((cb) => {
-      cb.addEventListener("change", (e) => {
+      cb.addEventListener("change", () => {
         const fId = cb.getAttribute("data-combat-friend-id");
+        const bm = getActiveBattleMode();
+        const maxCompanions = Math.max(0, (bm.maxLobbyPlayers || 20) - 1);
+        const currentTotalAllies =
+          state.activeCombatFriendIds.length +
+          state.randomAlliesHigh +
+          state.randomAlliesMid +
+          state.randomAlliesLow;
+
         if (cb.checked) {
+          if (currentTotalAllies >= maxCompanions) {
+            cb.checked = false;
+            showNotification(
+              `⚠️ Límite de sala alcanzado (${bm.maxLobbyPlayers} jugadores máx. en ${bm.pveGroupLabel || bm.name}).`,
+              "warning"
+            );
+            return;
+          }
           if (!state.activeCombatFriendIds.includes(fId)) {
             state.activeCombatFriendIds.push(fId);
           }
         } else {
           state.activeCombatFriendIds = state.activeCombatFriendIds.filter((id) => id !== fId);
         }
+        syncLobbyOccupancyUI(bm);
         renderCombatFriendsList();
         runOptimizerCalculation();
       });
@@ -1113,14 +1209,95 @@
 
     const bossCandidates = db.pokemon.filter((p) => p.isBossCandidate);
 
-    modeSelect.innerHTML = Object.values(db.battleModes)
-      .map(
-        (m) =>
-          `<option value="${m.id}" ${
-            m.id === state.selectedBattleModeId ? "selected" : ""
-          }>${m.name} (${m.bossHP.toLocaleString()} HP)</option>`
-      )
-      .join("");
+    function populateBattleModeOptions() {
+      const groups = {};
+      Object.values(db.battleModes).forEach((m) => {
+        const groupKey = m.pveGroupLabel || "Modalidades PvE";
+        if (!groups[groupKey]) groups[groupKey] = [];
+        groups[groupKey].push(m);
+      });
+
+      modeSelect.innerHTML = Object.entries(groups)
+        .map(
+          ([label, modes]) =>
+            `<optgroup label="${label}">${modes
+              .map(
+                (m) =>
+                  `<option value="${m.id}" ${
+                    m.id === state.selectedBattleModeId ? "selected" : ""
+                  }>${m.name} (${m.teamSize} Poké · Máx ${m.maxLobbyPlayers} Jug. · ${m.bossHP.toLocaleString()} HP)</option>`
+              )
+              .join("")}</optgroup>`
+        )
+        .join("");
+    }
+
+    populateBattleModeOptions();
+
+    const pveTypeBtns = document.querySelectorAll(".pve-type-btn");
+    const defaultModeByPveType = {
+      raid: "raid_t5",
+      megaraid: "raid_mega",
+      dynamax: "dmax_t5",
+      gigantamax: "gmax_t6"
+    };
+    const defaultBossByPveType = {
+      raid: "mewtwo",
+      megaraid: "rayquaza_mega",
+      dynamax: "palkia_dmax",
+      gigantamax: "duraludon_gmax"
+    };
+
+    function highlightPveTypeButtons(activePveType) {
+      pveTypeBtns.forEach((btn) => {
+        const bType = btn.getAttribute("data-pve-type");
+        const isActive = bType === activePveType;
+        if (bType === "raid") {
+          btn.className = isActive
+            ? "pve-type-btn p-2 rounded-xl border border-cyan-400 bg-cyan-500/20 text-white transition text-left shadow-sm"
+            : "pve-type-btn p-2 rounded-xl border border-slate-800 bg-slate-950 text-slate-300 hover:border-cyan-500/50 transition text-left";
+        } else if (bType === "megaraid") {
+          btn.className = isActive
+            ? "pve-type-btn p-2 rounded-xl border border-purple-400 bg-purple-500/20 text-white transition text-left shadow-sm"
+            : "pve-type-btn p-2 rounded-xl border border-slate-800 bg-slate-950 text-slate-300 hover:border-purple-500/50 transition text-left";
+        } else if (bType === "dynamax") {
+          btn.className = isActive
+            ? "pve-type-btn p-2 rounded-xl border border-pink-500 bg-pink-500/20 text-white transition text-left shadow-sm"
+            : "pve-type-btn p-2 rounded-xl border border-slate-800 bg-slate-950 text-slate-300 hover:border-pink-500/50 transition text-left";
+        } else if (bType === "gigantamax") {
+          btn.className = isActive
+            ? "pve-type-btn p-2 rounded-xl border border-amber-400 bg-amber-500/20 text-white transition text-left shadow-sm"
+            : "pve-type-btn p-2 rounded-xl border border-slate-800 bg-slate-950 text-slate-300 hover:border-amber-500/50 transition text-left";
+        }
+      });
+    }
+
+    pveTypeBtns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const pveType = btn.getAttribute("data-pve-type");
+        const targetModeId = defaultModeByPveType[pveType] || "raid_t5";
+        state.selectedBattleModeId = targetModeId;
+        modeSelect.value = targetModeId;
+
+        // Si el jefe actual no corresponde a la modalidad elegida, sugerir el jefe representativo de esa modalidad
+        const currentBoss = db.pokemon.find((p) => p.id === state.selectedBossId);
+        const bossModes = (currentBoss && currentBoss.defaultBossModes) || [];
+        const targetModeObj = db.battleModes[targetModeId];
+        const bossFitsPveType = bossModes.some(
+          (mId) => db.battleModes[mId] && db.battleModes[mId].pveType === pveType
+        );
+
+        if (!bossFitsPveType && defaultBossByPveType[pveType]) {
+          selectBossById(defaultBossByPveType[pveType]);
+          state.selectedBattleModeId = targetModeId;
+          modeSelect.value = targetModeId;
+        }
+
+        clampAlliesToLobbyLimit(targetModeObj);
+        renderCombatFriendsList();
+        runOptimizerCalculation();
+      });
+    });
 
     function populateBossSelectOptions(list = bossCandidates) {
       bossSelect.innerHTML = list
@@ -1210,6 +1387,8 @@
         if (!boss.defaultBossModes.includes(state.selectedBattleModeId)) {
           state.selectedBattleModeId = boss.defaultBossModes[0];
           modeSelect.value = state.selectedBattleModeId;
+          clampAlliesToLobbyLimit(getActiveBattleMode());
+          renderCombatFriendsList();
         }
       }
 
@@ -1325,6 +1504,9 @@
 
     modeSelect.addEventListener("change", () => {
       state.selectedBattleModeId = modeSelect.value;
+      const bm = getActiveBattleMode();
+      clampAlliesToLobbyLimit(bm);
+      renderCombatFriendsList();
       runOptimizerCalculation();
     });
 
@@ -1432,29 +1614,31 @@
       btn.addEventListener("click", () => {
         const target = btn.getAttribute("data-target");
         const delta = Number(btn.getAttribute("data-delta")) || 0;
+        const bm = getActiveBattleMode();
+        const maxCompanions = Math.max(0, (bm.maxLobbyPlayers || 20) - 1);
+        const currentTotalAllies =
+          state.activeCombatFriendIds.length +
+          state.randomAlliesHigh +
+          state.randomAlliesMid +
+          state.randomAlliesLow;
+
+        if (delta > 0 && currentTotalAllies >= maxCompanions) {
+          showNotification(
+            `⚠️ Sala llena: ${bm.name} permite máximo ${bm.maxLobbyPlayers} jugadores en total (Tú + ${maxCompanions} aliados).`,
+            "warning"
+          );
+          return;
+        }
 
         if (target === "random-allies-high") {
-          state.randomAlliesHigh = Math.max(0, Math.min(20, state.randomAlliesHigh + delta));
-          const el = document.getElementById("label-random-allies-high");
-          if (el) el.textContent = state.randomAlliesHigh;
+          state.randomAlliesHigh = Math.max(0, state.randomAlliesHigh + delta);
         } else if (target === "random-allies-mid") {
-          state.randomAlliesMid = Math.max(0, Math.min(20, state.randomAlliesMid + delta));
-          const el = document.getElementById("label-random-allies-mid");
-          if (el) el.textContent = state.randomAlliesMid;
+          state.randomAlliesMid = Math.max(0, state.randomAlliesMid + delta);
         } else if (target === "random-allies-low") {
-          state.randomAlliesLow = Math.max(0, Math.min(20, state.randomAlliesLow + delta));
-          const el = document.getElementById("label-random-allies-low");
-          if (el) el.textContent = state.randomAlliesLow;
+          state.randomAlliesLow = Math.max(0, state.randomAlliesLow + delta);
         }
 
-        const total = state.randomAlliesHigh + state.randomAlliesMid + state.randomAlliesLow;
-        const summaryWrap = document.getElementById("random-allies-summary");
-        const countTotal = document.getElementById("random-allies-count-total");
-        if (summaryWrap && countTotal) {
-          summaryWrap.classList.toggle("hidden", total <= 0);
-          countTotal.textContent = total;
-        }
-
+        clampAlliesToLobbyLimit(bm);
         runOptimizerCalculation();
       });
     });
@@ -1511,19 +1695,86 @@
 
   function renderBossSummary(bossProfile, battleMode) {
     document.getElementById("battle-mode-desc").textContent = battleMode.description;
+
+    // Sincronizar pestañas rápidas de categoría PvE (raid, megaraid, dynamax, gigantamax)
+    const activePveType =
+      battleMode.pveType || (battleMode.category === "max" ? "dynamax" : "raid");
+    document.querySelectorAll(".pve-type-btn").forEach((btn) => {
+      const bType = btn.getAttribute("data-pve-type");
+      const isActive = bType === activePveType;
+      if (bType === "raid") {
+        btn.className = isActive
+          ? "pve-type-btn p-2 rounded-xl border border-cyan-400 bg-cyan-500/20 text-white transition text-left shadow-sm"
+          : "pve-type-btn p-2 rounded-xl border border-slate-800 bg-slate-950 text-slate-300 hover:border-cyan-500/50 transition text-left";
+      } else if (bType === "megaraid") {
+        btn.className = isActive
+          ? "pve-type-btn p-2 rounded-xl border border-purple-400 bg-purple-500/20 text-white transition text-left shadow-sm"
+          : "pve-type-btn p-2 rounded-xl border border-slate-800 bg-slate-950 text-slate-300 hover:border-purple-500/50 transition text-left";
+      } else if (bType === "dynamax") {
+        btn.className = isActive
+          ? "pve-type-btn p-2 rounded-xl border border-pink-500 bg-pink-500/20 text-white transition text-left shadow-sm"
+          : "pve-type-btn p-2 rounded-xl border border-slate-800 bg-slate-950 text-slate-300 hover:border-pink-500/50 transition text-left";
+      } else if (bType === "gigantamax") {
+        btn.className = isActive
+          ? "pve-type-btn p-2 rounded-xl border border-amber-400 bg-amber-500/20 text-white transition text-left shadow-sm"
+          : "pve-type-btn p-2 rounded-xl border border-slate-800 bg-slate-950 text-slate-300 hover:border-amber-500/50 transition text-left";
+      }
+    });
+
     const catPill = document.getElementById("battle-category-pill");
-    if (battleMode.category === "max") {
-      catPill.textContent = "COMBATE MAX (3 POKÉMON)";
+    const limitsChip = document.getElementById("pve-limits-chip");
+
+    if (activePveType === "gigantamax") {
+      catPill.textContent = "GIGAMAX · 3 POKÉ MAX · 40 JUG.";
+      catPill.className =
+        "px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono font-bold uppercase bg-amber-500/25 text-amber-300 border border-amber-500/50 shrink-0";
+      if (limitsChip) {
+        limitsChip.textContent = "3 Poké Max/jug. · Sala Máx 40 (10 Patrullas de 4)";
+      }
+    } else if (activePveType === "dynamax") {
+      catPill.textContent = "DINAMAX · 3 POKÉ MAX · 4 JUG.";
       catPill.className =
         "px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono font-bold uppercase bg-pink-500/25 text-pink-300 border border-pink-500/50 shrink-0";
+      if (limitsChip) {
+        limitsChip.textContent = "3 Poké Max/jug. · Sala Máx 4 Jug.";
+      }
+    } else if (activePveType === "megaraid") {
+      catPill.textContent = "MEGA RAID · 6 POKÉ · 20 JUG.";
+      catPill.className =
+        "px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono font-bold uppercase bg-purple-500/25 text-purple-300 border border-purple-500/50 shrink-0";
+      if (limitsChip) {
+        limitsChip.textContent = "6 Poké/jug. (Máx 1 Mega) · Sala Máx 20 Jug.";
+      }
     } else {
-      catPill.textContent = "INCURSIÓN (6 POKÉMON)";
+      catPill.textContent = "RAID · 6 POKÉ · 20 JUG.";
       catPill.className =
         "px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono font-bold uppercase bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0";
+      if (limitsChip) {
+        limitsChip.textContent = "6 Poké/jug. (Máx 1 Mega) · Sala Máx 20 Jug.";
+      }
     }
 
     const partyContainer = document.getElementById("party-power-container");
-    partyContainer.classList.toggle("opacity-50", !battleMode.allowPartyPower);
+    if (partyContainer) {
+      partyContainer.classList.toggle("opacity-45", !battleMode.allowPartyPower);
+    }
+
+    const megaContainer = document.getElementById("mega-bonus-container");
+    const megaNote = document.getElementById("mega-bonus-mode-note");
+    if (megaContainer) {
+      const megaAllowed = battleMode.allowMegaBonus !== false;
+      megaContainer.classList.toggle("opacity-45", !megaAllowed);
+      if (megaNote) {
+        megaNote.textContent = megaAllowed
+          ? "Activo en Raids/Mega Raids"
+          : "No disponible en Dinamax/Gigamax";
+        megaNote.className = megaAllowed
+          ? "text-[10px] font-mono text-cyan-400"
+          : "text-[10px] font-mono text-amber-400";
+      }
+    }
+
+    syncLobbyOccupancyUI(battleMode);
 
     document.getElementById("boss-dex-label").textContent = `#${bossProfile.species.dex}`;
     document.getElementById("boss-name-display").textContent = bossProfile.species.name;
@@ -1535,8 +1786,16 @@
     document.getElementById("boss-time-display").textContent = `${bossProfile.timeLimitSec}s`;
     document.getElementById("boss-teamsize-display").textContent =
       battleMode.category === "max"
-        ? `3 Max (Patrulla ${battleMode.squadSize || 4})`
-        : `6 Raid (Máx ${battleMode.maxLobbyPlayers})`;
+        ? `${battleMode.teamSize} Poké Max`
+        : `${battleMode.teamSize} Poké Raid`;
+
+    const maxLobbyEl = document.getElementById("boss-maxlobby-display");
+    if (maxLobbyEl) {
+      maxLobbyEl.textContent =
+        activePveType === "gigantamax"
+          ? `40 (10x4)`
+          : `${battleMode.maxLobbyPlayers} Jug.`;
+    }
 
     const weakContainer = document.getElementById("boss-weaknesses-list");
     weakContainer.innerHTML = bossProfile.weaknesses

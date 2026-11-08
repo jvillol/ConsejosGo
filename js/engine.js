@@ -226,15 +226,27 @@
     };
   }
 
+  function isMegaOrPrimalSpecies(species) {
+    if (!species) return false;
+    return Boolean(
+      species.isMega ||
+      species.id.includes("_mega") ||
+      species.id.includes("_primal")
+    );
+  }
+
   function evaluateMaxPokemon(boxEntry, bossProfile, conditions) {
     const db = getDB();
-    const baseRaidEval = evaluateRaidPokemon(boxEntry, bossProfile, {
+    const maxConditions = {
       ...conditions,
-      partyPowerEnabled: false
-    });
+      partyPowerEnabled: false,
+      megaBonus: "none"
+    };
+    const baseRaidEval = evaluateRaidPokemon(boxEntry, bossProfile, maxConditions);
 
     const maxInfo = boxEntry.maxMoveInfo;
-    const isMaxEligible = Boolean(maxInfo && maxInfo.isMaxCapable);
+    const isMega = isMegaOrPrimalSpecies(boxEntry.species);
+    const isMaxEligible = Boolean(maxInfo && maxInfo.isMaxCapable && !isMega);
 
     const bossTypes = bossProfile.species.types;
     const attackerTypes = boxEntry.species.types;
@@ -242,7 +254,7 @@
     const maxMoveType = maxInfo.moveType || boxEntry.fastMoveObj.type;
     const maxSTAB = attackerTypes.includes(maxMoveType) ? db.combatModifiers.stab : 1.0;
     const maxTypeEff = getTypeEffectiveness(maxMoveType, bossTypes);
-    const ext = getExternalMultipliers(conditions, maxMoveType, maxTypeEff >= 1.0);
+    const ext = getExternalMultipliers(maxConditions, maxMoveType, maxTypeEff >= 1.0);
 
     const eternamaxBonus = maxInfo.maxClass === "eternamax" ? 1.15 : 1.0;
 
@@ -330,25 +342,59 @@
 
     if (battleMode.category === "raid") {
       const sorted = [...evaluatedList].sort((a, b) => b.score - a.score);
-      const top6 = sorted.slice(0, battleMode.teamSize || 6).map((item, idx) => ({
-        ...item,
-        slotNumber: idx + 1,
-        roleLabel: idx === 0 ? "Líder DPS #1" : `Atacante #${idx + 1}`,
-        roleBadgeClass:
-          idx === 0
-            ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
-            : "bg-cyan-500/20 text-cyan-300 border-cyan-500/40"
-      }));
+      const maxTeamSize = battleMode.teamSize || 6;
+      const maxMegasAllowed = battleMode.maxMegasPerTeam !== undefined ? battleMode.maxMegasPerTeam : 1;
+      const selected = [];
+      let megaCount = 0;
+
+      for (const item of sorted) {
+        if (selected.length >= maxTeamSize) break;
+        const isMega = isMegaOrPrimalSpecies(item.boxEntry.species);
+        if (isMega) {
+          if (megaCount >= maxMegasAllowed) continue;
+          megaCount++;
+        }
+        selected.push(item);
+      }
+
+      const topTeam = selected.map((item, idx) => {
+        const isMega = isMegaOrPrimalSpecies(item.boxEntry.species);
+        return {
+          ...item,
+          slotNumber: idx + 1,
+          roleLabel: isMega
+            ? `Slot ${idx + 1} · Mega / Primigenio Activo`
+            : idx === 0
+            ? "Slot 1 · Líder DPS"
+            : `Slot ${idx + 1} · Atacante Raid`,
+          roleBadgeClass: isMega
+            ? "bg-amber-500/25 text-amber-300 border-amber-500/50"
+            : idx === 0
+            ? "bg-cyan-500/25 text-cyan-200 border-cyan-400/50"
+            : "bg-cyan-500/15 text-cyan-300 border-cyan-500/30"
+        };
+      });
 
       return {
-        team: top6,
+        team: topTeam,
         missingMaxWarning: false
       };
     }
 
-    const maxCapablePool = evaluatedList.filter((item) => item.isMaxEligible);
-    const poolToUse = maxCapablePool.length > 0 ? maxCapablePool : evaluatedList;
+    // Modo Combate Max (Dinamax / Gigamax): Máximo 3 Pokémon, 0 Megas permitidas
+    const nonMegaList = evaluatedList.filter(
+      (item) => !isMegaOrPrimalSpecies(item.boxEntry.species)
+    );
+    const maxCapablePool = nonMegaList.filter((item) => item.isMaxEligible);
+    const poolToUse = maxCapablePool.length > 0 ? maxCapablePool : nonMegaList;
     const missingMaxWarning = maxCapablePool.length === 0;
+
+    if (poolToUse.length === 0) {
+      return {
+        team: [],
+        missingMaxWarning: true
+      };
+    }
 
     if (poolToUse.length === 1) {
       return {
@@ -356,7 +402,7 @@
           {
             ...poolToUse[0],
             slotNumber: 1,
-            roleLabel: "Todoterreno Max (Tanque + DPS)",
+            roleLabel: "Slot 1/3 · Todoterreno Max (Tanque + DPS)",
             roleBadgeClass: "bg-pink-500/20 text-pink-300 border-pink-500/40"
           }
         ],
@@ -383,7 +429,7 @@
       finalTeam.push({
         ...tank1,
         slotNumber: 1,
-        roleLabel: "Slot 1 · Tanque & Cargador (0.5s)",
+        roleLabel: "Slot 1/3 · Tanque & Cargador (0.5s)",
         roleBadgeClass: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
       });
     }
@@ -394,8 +440,8 @@
         slotNumber: finalTeam.length + 1,
         roleLabel:
           tank2.maxInfo.spiritLevel > 0 || tank2.maxInfo.guardLevel > 0
-            ? "Slot 2 · Tanque Soporte"
-            : "Slot 2 · Tanque Secundario",
+            ? `Slot ${finalTeam.length + 1}/3 · Tanque Soporte`
+            : `Slot ${finalTeam.length + 1}/3 · Tanque Secundario`,
         roleBadgeClass: "bg-cyan-500/20 text-cyan-300 border-cyan-500/40"
       });
     }
@@ -403,12 +449,12 @@
     finalTeam.push({
       ...maxFinisher,
       slotNumber: finalTeam.length + 1,
-      roleLabel: `Slot ${finalTeam.length + 1} · Rematador (${maxFinisher.maxInfo.moveName})`,
+      roleLabel: `Slot ${finalTeam.length + 1}/3 · Rematador (${maxFinisher.maxInfo.moveName})`,
       roleBadgeClass: "bg-pink-500/25 text-pink-300 border-pink-500/50"
     });
 
     return {
-      team: finalTeam.slice(0, 3),
+      team: finalTeam.slice(0, battleMode.teamSize || 3),
       missingMaxWarning
     };
   }
@@ -522,9 +568,13 @@
     // 3. Estimación del Daño por compañero desconocido en 3 Escenarios
     const bestWeaknessMult =
       bossProfile.weaknesses.length > 0 ? bossProfile.weaknesses[0].multiplier : 1.6;
-    const ext = getExternalMultipliers(conditions, null, true);
+    const effectiveConditions =
+      battleMode.category === "max"
+        ? { ...conditions, partyPowerEnabled: false, megaBonus: "none" }
+        : conditions;
+    const ext = getExternalMultipliers(effectiveConditions, null, true);
     const partyFactor =
-      battleMode.allowPartyPower && conditions.partyPowerEnabled ? 1.32 : 1.0;
+      battleMode.allowPartyPower && effectiveConditions.partyPowerEnabled ? 1.32 : 1.0;
 
     const refHardcoreAtk = (295 + 15) * 0.825 * 1.08;
     const refStandardAtk = (245 + 13) * 0.755;
@@ -567,11 +617,20 @@
       Math.round((baseHitCasual / 2.9) * (effectiveTimeWindow * 0.62))
     );
 
-    // Compañeros aleatorios (Gente Random en la sala categorizada por nivel)
+    // Límite estricto de jugadores por sala según modalidad PvE (4 Dinamax, 20 Raid/Mega, 40 Gigamax)
+    const maxLobbyPlayers = battleMode.maxLobbyPlayers || 20;
+    const activeFriendsCount = friendsBreakdown.length;
+    let remainingSlotsForRandoms = Math.max(0, maxLobbyPlayers - 1 - activeFriendsCount);
+
+    // Compañeros aleatorios (Gente Random en la sala categorizada por nivel, respetando el tope del lobby)
     const randomAllies = conditions.randomAllies || {};
-    const randomHighCount = Math.max(0, Number(randomAllies.high) || 0);
-    const randomMidCount = Math.max(0, Number(randomAllies.mid) || 0);
-    const randomLowCount = Math.max(0, Number(randomAllies.low) || 0);
+    const randomHighCount = Math.min(remainingSlotsForRandoms, Math.max(0, Number(randomAllies.high) || 0));
+    remainingSlotsForRandoms -= randomHighCount;
+    const randomMidCount = Math.min(remainingSlotsForRandoms, Math.max(0, Number(randomAllies.mid) || 0));
+    remainingSlotsForRandoms -= randomMidCount;
+    const randomLowCount = Math.min(remainingSlotsForRandoms, Math.max(0, Number(randomAllies.low) || 0));
+    remainingSlotsForRandoms -= randomLowCount;
+
     const totalRandomCount = randomHighCount + randomMidCount + randomLowCount;
 
     const randomHighDamage = randomHighCount * allyDamageHardcore;
@@ -597,14 +656,16 @@
       : Math.ceil(remainingBossHP / allyDamageCasual);
 
     const samplePartyMult =
-      myTeam[0] && myTeam[0].partyChargedMultiplier ? myTeam[0].partyChargedMultiplier : 1.0;
+      battleMode.allowPartyPower && myTeam[0] && myTeam[0].partyChargedMultiplier
+        ? myTeam[0].partyChargedMultiplier
+        : 1.0;
     const activeMultiplier =
       Math.round(ext.combinedExternal * samplePartyMult * 100) / 100;
 
     // Frase directa y clara
     let directRecommendation = "";
-    const activeFriendsCount = friendsBreakdown.length;
     const totalCurrentPlayers = 1 + activeFriendsCount + totalRandomCount;
+    const availableSlots = Math.max(0, maxLobbyPlayers - totalCurrentPlayers);
 
     if (myTeam.length === 0) {
       directRecommendation =
@@ -615,14 +676,14 @@
         if (randomHighCount > 0) randomDetails.push(`${randomHighCount} Nv. Alto`);
         if (randomMidCount > 0) randomDetails.push(`${randomMidCount} Nv. Medio`);
         if (randomLowCount > 0) randomDetails.push(`${randomLowCount} Nv. Bajo`);
-        directRecommendation = `🎉 ¡Victoria Asegurada con este grupo! Entre tu equipo (${myPerformance.pct}%), ${
+        directRecommendation = `🎉 ¡Victoria Asegurada (${totalCurrentPlayers}/${maxLobbyPlayers} jug. en sala)! Entre tu equipo (${myPerformance.pct}%), ${
           activeFriendsCount > 0 ? "tus amigos fijos y " : ""
-        }los ${totalRandomCount} randoms (${randomDetails.join(", ")}, +${randomPct}%) alcanzáis el ${combinedGroupPct}% del jefe. ¡Derrota garantizada!`;
+        }los ${totalRandomCount} randoms (${randomDetails.join(", ")}, +${randomPct}%) alcanzáis el ${combinedGroupPct}% de ${bossSpecies.name}.`;
       } else if (activeFriendsCount === 0) {
-        directRecommendation = `🏆 ¡Victoria en Solitario viable! Bajas tú solo el ${myPerformance.pct}% de la vida de ${bossSpecies.name} sin necesidad de más compañeros.`;
+        directRecommendation = `🏆 ¡Victoria en Solitario viable (1/${maxLobbyPlayers} jug.)! Bajas tú solo el ${myPerformance.pct}% de la vida de ${bossSpecies.name} con tus ${battleMode.teamSize} Pokémon.`;
       } else {
         const friendNames = friendsBreakdown.map((f) => f.friend.name).join(", ");
-        directRecommendation = `🎉 ¡Victoria Asegurada en Grupo! Entre tú (${myPerformance.pct}%) y tu(s) amigo(s) ${friendNames} (${Math.round((totalFriendsDamage / bossProfile.hp) * 100)}%) cubrís el ${combinedGroupPct}% del jefe. ¡No necesitáis más jugadores!`;
+        directRecommendation = `🎉 ¡Victoria Asegurada en Grupo (${totalCurrentPlayers}/${maxLobbyPlayers} jug.)! Entre tú (${myPerformance.pct}%) y ${friendNames} (${Math.round((totalFriendsDamage / bossProfile.hp) * 100)}%) cubrís el ${combinedGroupPct}% del jefe.`;
       }
     } else {
       const friendsText =
@@ -634,29 +695,40 @@
           ? ` y ${totalRandomCount} random (+${randomPct}%)`
           : "";
 
-      if (battleMode.id === "dmax_t5" || battleMode.id === "dmax_t3") {
-        const maxCapacity = 4;
-        const availableSlots = Math.max(0, maxCapacity - totalCurrentPlayers);
+      if (battleMode.pveType === "dynamax") {
         const warning =
-          standardNeeded > availableSlots
-            ? ` ⚠️ El lobby Dinamax solo admite 4 jugadores en total (te quedan ${availableSlots} huecos libres). Necesitas compañeros de nivel Alto (Hardcore) para no fallar.`
-            : ` (Lobby Dinamax: ${totalCurrentPlayers}/4 jugadores ocupados).`;
-        directRecommendation = `Con tu equipo${friendsText}${randomText} cubrís el ${combinedGroupPct}% de ${bossSpecies.name}. Aún necesitas sumar mínimo +${hardcoreNeeded} jugador(es) de Nivel Alto, o +${standardNeeded} de Nivel Medio.${warning}`;
-      } else if (battleMode.id === "gmax_t6") {
+          availableSlots === 0
+            ? ` ⚠️ ¡Sala Dinamax llena (4/4 jugadores)! Con este grupo no llegáis al 100%; necesitáis subir nivel de ataques Max o llevar mejores counters.`
+            : standardNeeded > availableSlots
+            ? ` ⚠️ El lobby Dinamax admite máximo 4 jugadores (quedan ${availableSlots} huecos libres y 3 Pokémon Max/jugador). Necesitas obligatoriamente compañeros de Nivel Alto.`
+            : ` (Sala Dinamax: ${totalCurrentPlayers}/4 jugadores ocupados · Quedan ${availableSlots} huecos · Máx. 3 Pokémon Max/jug.).`;
+        directRecommendation = `Con tu patrulla${friendsText}${randomText} cubrís el ${combinedGroupPct}% de ${bossSpecies.name}. Aún necesitas sumar mínimo +${hardcoreNeeded} jugador(es) de Nivel Alto, o +${standardNeeded} de Nivel Medio.${warning}`;
+      } else if (battleMode.pveType === "gigantamax") {
         const totalSquads = Math.ceil((totalCurrentPlayers + standardNeeded) / 4);
-        directRecommendation = `Gigamax Nv. 6 (${bossProfile.hp.toLocaleString()} HP): Tu grupo${friendsText}${randomText} cubre el ${combinedGroupPct}%. Aún necesitáis al menos +${hardcoreNeeded} jugadores de Nivel Alto, o +${standardNeeded} de Nivel Medio (~${totalSquads} patrullas), o +${casualNeeded}+ de Nivel Bajo.`;
+        directRecommendation = `Gigamax Nv. 6 (${bossProfile.hp.toLocaleString()} PS · Sala ${totalCurrentPlayers}/40 jug. · 3 Poké Max/jug.): Tu grupo${friendsText}${randomText} cubre el ${combinedGroupPct}%. Aún necesitáis +${hardcoreNeeded} jugadores de Nivel Alto, o +${standardNeeded} de Nivel Medio (~${totalSquads} patrullas de 4), o +${casualNeeded}+ de Nivel Bajo.`;
       } else {
-        directRecommendation = `Con tu equipo${friendsText}${randomText} tenéis el ${combinedGroupPct}% de ${bossSpecies.name}. Aún necesitáis sumar al menos +${hardcoreNeeded} jugador(es) de Nivel Alto, o +${standardNeeded} de Nivel Medio, o +${casualNeeded}+ de Nivel Bajo.`;
+        const modeLabel = battleMode.pveType === "megaraid" ? "Mega Incursión" : "Incursión";
+        directRecommendation = `${modeLabel} (Sala ${totalCurrentPlayers}/20 jug. · 6 Pokémon/jug.): Con tu equipo${friendsText}${randomText} tenéis el ${combinedGroupPct}% de ${bossSpecies.name}. Aún necesitáis sumar al menos +${hardcoreNeeded} jugador(es) de Nivel Alto, o +${standardNeeded} de Nivel Medio, o +${casualNeeded}+ de Nivel Bajo.`;
       }
     }
 
     return {
       bossProfile,
       battleMode,
-      conditions,
+      conditions: effectiveConditions,
       team: myTeam,
       missingMaxWarning,
       friendsBreakdown,
+      lobbyCapacityInfo: {
+        currentPlayers: totalCurrentPlayers,
+        maxLobbyPlayers,
+        availableSlots,
+        maxPokemonPerPlayer: battleMode.teamSize || 6,
+        squadSize: battleMode.squadSize || null,
+        maxSquads: battleMode.maxSquads || null,
+        pveType: battleMode.pveType || battleMode.category,
+        allowRelobby: Boolean(battleMode.allowRelobby)
+      },
       randomMetrics: {
         highCount: randomHighCount,
         midCount: randomMidCount,

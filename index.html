@@ -167,16 +167,58 @@
             </div>
 
             <div class="space-y-4">
-              <!-- Selector del Tipo de Combate -->
-              <div>
-                <label for="select-battle-mode" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
-                  Tipo de Incursión / Combate Max
-                </label>
+              <!-- Selector del Tipo de Combate y Categorías PvE -->
+              <div class="space-y-2">
+                <div class="flex items-center justify-between">
+                  <label for="select-battle-mode" class="block text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    Modalidad PvE y Capacidad de Sala
+                  </label>
+                  <span id="pve-limits-chip" class="text-[10px] font-mono font-bold text-cyan-300 bg-cyan-500/15 border border-cyan-500/30 px-2 py-0.5 rounded-full">
+                    3 Poké Max · Máx 4 Jug.
+                  </span>
+                </div>
+
+                <!-- Botones Rápidos de las 4 Categorías PvE -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5" id="pve-type-quick-tabs">
+                  <button
+                    type="button"
+                    data-pve-type="raid"
+                    class="pve-type-btn p-2 rounded-xl border border-slate-800 bg-slate-950 text-slate-300 hover:border-cyan-500/50 transition text-left"
+                  >
+                    <span class="block text-xs font-extrabold text-cyan-300">⚔️ Raids</span>
+                    <span class="block text-[10px] font-mono text-slate-400">6 Poké · 20 Jug.</span>
+                  </button>
+                  <button
+                    type="button"
+                    data-pve-type="megaraid"
+                    class="pve-type-btn p-2 rounded-xl border border-slate-800 bg-slate-950 text-slate-300 hover:border-purple-500/50 transition text-left"
+                  >
+                    <span class="block text-xs font-extrabold text-purple-300">🧬 Mega Raid</span>
+                    <span class="block text-[10px] font-mono text-slate-400">6 Poké · 20 Jug.</span>
+                  </button>
+                  <button
+                    type="button"
+                    data-pve-type="dynamax"
+                    class="pve-type-btn p-2 rounded-xl border border-pink-500/70 bg-pink-500/20 text-white transition text-left shadow-sm"
+                  >
+                    <span class="block text-xs font-extrabold text-pink-300">⚡ Dinamax</span>
+                    <span class="block text-[10px] font-mono text-pink-200">3 Max · 4 Jug.</span>
+                  </button>
+                  <button
+                    type="button"
+                    data-pve-type="gigantamax"
+                    class="pve-type-btn p-2 rounded-xl border border-slate-800 bg-slate-950 text-slate-300 hover:border-amber-500/50 transition text-left"
+                  >
+                    <span class="block text-xs font-extrabold text-amber-300">🌀 Gigamax</span>
+                    <span class="block text-[10px] font-mono text-slate-400">3 Max · 40 Jug.</span>
+                  </button>
+                </div>
+
                 <select
                   id="select-battle-mode"
                   class="w-full min-h-[44px] rounded-xl bg-slate-950/90 border border-slate-700/80 px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition"
                 ></select>
-                <p id="battle-mode-desc" class="mt-1.5 text-xs text-slate-400 leading-relaxed">
+                <p id="battle-mode-desc" class="mt-1 text-xs text-slate-400 leading-relaxed">
                   Selecciona el nivel de incursión o combate Dinamax/Gigamax.
                 </p>
               </div>
@@ -282,7 +324,7 @@
                   <div id="boss-types-badges" class="flex flex-wrap items-center justify-end gap-1.5"></div>
                 </div>
 
-                <div class="grid grid-cols-3 gap-2 text-center bg-slate-900/90 rounded-lg p-2 border border-slate-800/70">
+                <div class="grid grid-cols-4 gap-1.5 text-center bg-slate-900/90 rounded-lg p-2 border border-slate-800/70">
                   <div>
                     <span class="block text-[10px] uppercase text-slate-400">PS Jefe</span>
                     <strong id="boss-hp-display" class="font-mono text-xs sm:text-sm text-pink-400">27.000 HP</strong>
@@ -294,6 +336,10 @@
                   <div>
                     <span class="block text-[10px] uppercase text-slate-400">Equipo</span>
                     <strong id="boss-teamsize-display" class="font-mono text-xs sm:text-sm text-emerald-400">3 Max</strong>
+                  </div>
+                  <div>
+                    <span class="block text-[10px] uppercase text-slate-400">Máx Sala</span>
+                    <strong id="boss-maxlobby-display" class="font-mono text-xs sm:text-sm text-amber-300">4 Jug.</strong>
                   </div>
                 </div>
 
@@ -325,15 +371,17 @@
 
           <!-- SELECCIONAR COMPAÑEROS ALEATORIOS (GENTE RANDOM EN LA SALA) -->
           <div class="bg-slate-900/90 backdrop-blur-md border border-cyan-500/30 rounded-2xl p-4 sm:p-5 shadow-xl space-y-3.5">
-            <div class="flex items-center justify-between">
+            <div class="flex items-center justify-between gap-2">
               <h2 class="font-display text-xs sm:text-base font-bold uppercase tracking-wider text-cyan-300 flex items-center gap-2">
                 <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
-                <span>🎲 Gente Random en la Incursión</span>
+                <span>🎲 Gente Random en la Sala</span>
               </h2>
-              <span class="text-[10px] font-mono text-slate-400 uppercase">Sin equipo conocido</span>
+              <span id="lobby-occupancy-badge" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0">
+                Sala: 1 / 4 Jug.
+              </span>
             </div>
             <p class="text-xs text-slate-400 leading-relaxed">
-              ¿Entraron jugadores desconocidos a la sala? Indica cuántos hay según su nivel aproximado para sumar su daño estimado:
+              ¿Entraron jugadores desconocidos a la sala? Indica cuántos hay por nivel (respetando el límite máximo del lobby):
             </p>
 
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
@@ -482,10 +530,13 @@
             </div>
 
             <!-- Bono de Megaevolución Aliada con Botones Claros -->
-            <div class="space-y-1.5">
-              <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">
-                Megaevolución Aliada en el Combate
-              </label>
+            <div id="mega-bonus-container" class="space-y-1.5">
+              <div class="flex items-center justify-between">
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  Megaevolución Aliada en el Combate
+                </label>
+                <span id="mega-bonus-mode-note" class="text-[10px] font-mono text-slate-400">Solo en Raids/Mega Raids</span>
+              </div>
               <div class="grid grid-cols-3 gap-1.5" id="mega-bonus-buttons-grid">
                 <button type="button" data-mega-val="none" class="mega-bonus-btn p-2 rounded-lg text-xs font-bold border border-cyan-400/80 bg-cyan-500/25 text-cyan-200">
                   ❌ Sin Mega (0%)
