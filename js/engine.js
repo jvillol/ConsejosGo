@@ -519,12 +519,6 @@
       });
     }
 
-    // Daño combinado entre Yo y mis Amigos Fijos
-    const combinedGroupDamage = myPerformance.damage + totalFriendsDamage;
-    const combinedGroupPct = Math.round((combinedGroupDamage / bossProfile.hp) * 1000) / 10;
-    const remainingBossHP = Math.max(0, bossProfile.hp - combinedGroupDamage);
-    const canBeatWithFriends = combinedGroupDamage >= bossProfile.hp;
-
     // 3. Estimación del Daño por compañero desconocido en 3 Escenarios
     const bestWeaknessMult =
       bossProfile.weaknesses.length > 0 ? bossProfile.weaknesses[0].multiplier : 1.6;
@@ -573,6 +567,25 @@
       Math.round((baseHitCasual / 2.9) * (effectiveTimeWindow * 0.62))
     );
 
+    // Compañeros aleatorios (Gente Random en la sala categorizada por nivel)
+    const randomAllies = conditions.randomAllies || {};
+    const randomHighCount = Math.max(0, Number(randomAllies.high) || 0);
+    const randomMidCount = Math.max(0, Number(randomAllies.mid) || 0);
+    const randomLowCount = Math.max(0, Number(randomAllies.low) || 0);
+    const totalRandomCount = randomHighCount + randomMidCount + randomLowCount;
+
+    const randomHighDamage = randomHighCount * allyDamageHardcore;
+    const randomMidDamage = randomMidCount * allyDamageStandard;
+    const randomLowDamage = randomLowCount * allyDamageCasual;
+    const totalRandomDamage = randomHighDamage + randomMidDamage + randomLowDamage;
+    const randomPct = Math.round((totalRandomDamage / bossProfile.hp) * 1000) / 10;
+
+    // Daño total combinado (Tú + Amigos Fijos + Gente Random)
+    const combinedGroupDamage = myPerformance.damage + totalFriendsDamage + totalRandomDamage;
+    const combinedGroupPct = Math.round((combinedGroupDamage / bossProfile.hp) * 1000) / 10;
+    const remainingBossHP = Math.max(0, bossProfile.hp - combinedGroupDamage);
+    const canBeatWithFriends = combinedGroupDamage >= bossProfile.hp;
+
     const hardcoreNeeded = canBeatWithFriends
       ? 0
       : Math.ceil(remainingBossHP / allyDamageHardcore);
@@ -591,13 +604,21 @@
     // Frase directa y clara
     let directRecommendation = "";
     const activeFriendsCount = friendsBreakdown.length;
-    const totalCurrentPlayers = 1 + activeFriendsCount;
+    const totalCurrentPlayers = 1 + activeFriendsCount + totalRandomCount;
 
     if (myTeam.length === 0) {
       directRecommendation =
-        "Tu Caja Pokémon personal está vacía. Añade tus Pokémon o pulsa 'Cargar Caja Demo'.";
+        "Tu Caja Pokémon personal está vacía. Añade tus Pokémon con sus PC e IVs.";
     } else if (canBeatWithFriends) {
-      if (activeFriendsCount === 0) {
+      if (totalRandomCount > 0) {
+        const randomDetails = [];
+        if (randomHighCount > 0) randomDetails.push(`${randomHighCount} Nv. Alto`);
+        if (randomMidCount > 0) randomDetails.push(`${randomMidCount} Nv. Medio`);
+        if (randomLowCount > 0) randomDetails.push(`${randomLowCount} Nv. Bajo`);
+        directRecommendation = `🎉 ¡Victoria Asegurada con este grupo! Entre tu equipo (${myPerformance.pct}%), ${
+          activeFriendsCount > 0 ? "tus amigos fijos y " : ""
+        }los ${totalRandomCount} randoms (${randomDetails.join(", ")}, +${randomPct}%) alcanzáis el ${combinedGroupPct}% del jefe. ¡Derrota garantizada!`;
+      } else if (activeFriendsCount === 0) {
         directRecommendation = `🏆 ¡Victoria en Solitario viable! Bajas tú solo el ${myPerformance.pct}% de la vida de ${bossSpecies.name} sin necesidad de más compañeros.`;
       } else {
         const friendNames = friendsBreakdown.map((f) => f.friend.name).join(", ");
@@ -606,21 +627,26 @@
     } else {
       const friendsText =
         activeFriendsCount > 0
-          ? ` (contando con ${friendsBreakdown.map((f) => f.friend.name).join(" y ")})`
+          ? ` (con ${friendsBreakdown.map((f) => f.friend.name).join(" y ")})`
           : "";
+      const randomText =
+        totalRandomCount > 0
+          ? ` y ${totalRandomCount} random (+${randomPct}%)`
+          : "";
+
       if (battleMode.id === "dmax_t5" || battleMode.id === "dmax_t3") {
         const maxCapacity = 4;
         const availableSlots = Math.max(0, maxCapacity - totalCurrentPlayers);
         const warning =
           standardNeeded > availableSlots
-            ? ` ⚠️ El lobby Dinamax solo admite 4 jugadores en total (te quedan ${availableSlots} huecos libres). Necesitas obligatoriamente compañeros de nivel Hardcore para no fallar el combate.`
+            ? ` ⚠️ El lobby Dinamax solo admite 4 jugadores en total (te quedan ${availableSlots} huecos libres). Necesitas compañeros de nivel Alto (Hardcore) para no fallar.`
             : ` (Lobby Dinamax: ${totalCurrentPlayers}/4 jugadores ocupados).`;
-        directRecommendation = `Con tu equipo${friendsText} aportáis el ${combinedGroupPct}% de daño a ${bossSpecies.name}. Para vencer necesitas añadir mínimo +${hardcoreNeeded} jugador(es) Hardcore, o +${standardNeeded} Estándar.${warning}`;
+        directRecommendation = `Con tu equipo${friendsText}${randomText} cubrís el ${combinedGroupPct}% de ${bossSpecies.name}. Aún necesitas sumar mínimo +${hardcoreNeeded} jugador(es) de Nivel Alto, o +${standardNeeded} de Nivel Medio.${warning}`;
       } else if (battleMode.id === "gmax_t6") {
         const totalSquads = Math.ceil((totalCurrentPlayers + standardNeeded) / 4);
-        directRecommendation = `Gigamax Nv. 6 (${bossProfile.hp.toLocaleString()} HP): Tu grupo${friendsText} aporta el ${combinedGroupPct}%. Necesitáis sumar al lobby al menos +${hardcoreNeeded} jugadores Hardcore, o +${standardNeeded} Estándar (~${totalSquads} patrullas completas), o +${casualNeeded}+ Casuales.`;
+        directRecommendation = `Gigamax Nv. 6 (${bossProfile.hp.toLocaleString()} HP): Tu grupo${friendsText}${randomText} cubre el ${combinedGroupPct}%. Aún necesitáis al menos +${hardcoreNeeded} jugadores de Nivel Alto, o +${standardNeeded} de Nivel Medio (~${totalSquads} patrullas), o +${casualNeeded}+ de Nivel Bajo.`;
       } else {
-        directRecommendation = `Con tu equipo${friendsText} tenéis el ${combinedGroupPct}% de ${bossSpecies.name}. Necesitáis sumar como mínimo +${hardcoreNeeded} jugador(es) Hardcore, o +${standardNeeded} Estándar, o +${casualNeeded}+ Casuales.`;
+        directRecommendation = `Con tu equipo${friendsText}${randomText} tenéis el ${combinedGroupPct}% de ${bossSpecies.name}. Aún necesitáis sumar al menos +${hardcoreNeeded} jugador(es) de Nivel Alto, o +${standardNeeded} de Nivel Medio, o +${casualNeeded}+ de Nivel Bajo.`;
       }
     }
 
@@ -631,6 +657,14 @@
       team: myTeam,
       missingMaxWarning,
       friendsBreakdown,
+      randomMetrics: {
+        highCount: randomHighCount,
+        midCount: randomMidCount,
+        lowCount: randomLowCount,
+        totalCount: totalRandomCount,
+        totalDamage: totalRandomDamage,
+        pct: randomPct
+      },
       personalMetrics: {
         teamDPS: myPerformance.dps,
         teamTDO: myPerformance.tdo,

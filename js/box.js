@@ -14,51 +14,63 @@
   const STORAGE_KEY_BOX = "pokeraid_max_optimizer_box_v3";
   const STORAGE_KEY_FRIENDS = "pokeraid_max_optimizer_friends_v2";
 
-  // Lista CPM interpolada (Nivel 15 a 51)
-  const FULL_CPM_LIST = [
-    { level: 15, cpm: 0.51739395 },
-    { level: 16, cpm: 0.53435433 },
-    { level: 17, cpm: 0.55079269 },
-    { level: 18, cpm: 0.56675452 },
-    { level: 19, cpm: 0.58227891 },
-    { level: 20, cpm: 0.59740001 },
-    { level: 21, cpm: 0.61215729 },
-    { level: 22, cpm: 0.62656713 },
-    { level: 22.5, cpm: 0.63364450 },
-    { level: 23, cpm: 0.64065295 },
-    { level: 24, cpm: 0.65443563 },
-    { level: 25, cpm: 0.66793400 },
-    { level: 26, cpm: 0.68116492 },
-    { level: 27, cpm: 0.69414365 },
-    { level: 28, cpm: 0.70688421 },
-    { level: 29, cpm: 0.71939909 },
-    { level: 30, cpm: 0.73170000 },
-    { level: 31, cpm: 0.73776948 },
-    { level: 32, cpm: 0.74378943 },
-    { level: 32.5, cpm: 0.74678121 },
-    { level: 33, cpm: 0.74976104 },
-    { level: 34, cpm: 0.75568551 },
-    { level: 35, cpm: 0.76156384 },
-    { level: 36, cpm: 0.76739717 },
-    { level: 37, cpm: 0.77318650 },
-    { level: 37.5, cpm: 0.77606496 },
-    { level: 38, cpm: 0.77893275 },
-    { level: 39, cpm: 0.78463697 },
-    { level: 40, cpm: 0.79030001 },
-    { level: 41, cpm: 0.79530001 },
-    { level: 42, cpm: 0.80030000 },
-    { level: 42.5, cpm: 0.80279999 },
-    { level: 43, cpm: 0.80530000 },
-    { level: 44, cpm: 0.81029999 },
-    { level: 45, cpm: 0.81529999 },
-    { level: 46, cpm: 0.82029999 },
-    { level: 47, cpm: 0.82529999 },
-    { level: 47.5, cpm: 0.82779999 },
-    { level: 48, cpm: 0.83029999 },
-    { level: 49, cpm: 0.83529999 },
-    { level: 50, cpm: 0.84029999 },
-    { level: 51, cpm: 0.84529999 }
-  ];
+  // Tabla base oficial de CPM para niveles enteros 1 a 40
+  const BASE_CPMS = {
+    1: 0.094,
+    2: 0.16639787,
+    3: 0.21573247,
+    4: 0.25572005,
+    5: 0.29024988,
+    6: 0.3210876,
+    7: 0.34921268,
+    8: 0.37523559,
+    9: 0.39956728,
+    10: 0.4225,
+    11: 0.44310755,
+    12: 0.46279839,
+    13: 0.48168495,
+    14: 0.49985844,
+    15: 0.51739395,
+    16: 0.53435433,
+    17: 0.55079269,
+    18: 0.56675452,
+    19: 0.58227891,
+    20: 0.59740001,
+    21: 0.61215729,
+    22: 0.62656713,
+    23: 0.64065295,
+    24: 0.65443563,
+    25: 0.66793400,
+    26: 0.68116492,
+    27: 0.69414365,
+    28: 0.70688421,
+    29: 0.71939909,
+    30: 0.73170000,
+    31: 0.73776948,
+    32: 0.74378943,
+    33: 0.74976104,
+    34: 0.75568551,
+    35: 0.76156384,
+    36: 0.76739717,
+    37: 0.77318650,
+    38: 0.77893275,
+    39: 0.78463697,
+    40: 0.79030001
+  };
+
+  // Generar lista completa de CPM para todos los medios niveles (1.0 a 51.0)
+  const FULL_CPM_LIST = [];
+  for (let lvl = 1; lvl <= 40; lvl++) {
+    FULL_CPM_LIST.push({ level: lvl, cpm: BASE_CPMS[lvl] });
+    if (lvl < 40) {
+      const halfCpm = Math.sqrt((Math.pow(BASE_CPMS[lvl], 2) + Math.pow(BASE_CPMS[lvl + 1], 2)) / 2);
+      FULL_CPM_LIST.push({ level: lvl + 0.5, cpm: halfCpm });
+    }
+  }
+  for (let lvl = 40.5; lvl <= 51; lvl += 0.5) {
+    const xlCpm = 0.79030001 + (lvl - 40) * 0.005;
+    FULL_CPM_LIST.push({ level: lvl, cpm: Math.round(xlCpm * 100000000) / 100000000 });
+  }
 
   function getDB() {
     if (!global.POKE_DB) {
@@ -101,13 +113,19 @@
   }
 
   function estimateLevelFromCP(species, ivAtk, ivDef, ivSta, targetCP) {
-    if (!species || !targetCP || Number(targetCP) < 10) {
-      return { level: 40, cpm: getCPMForLevel(40), presetId: "no_xl" };
+    if (!species) {
+      return { level: 40, cpm: getCPMForLevel(40), badge: "Nv. 40", cp: 3000, presetId: "no_xl" };
     }
 
-    const desiredCP = Number(targetCP);
+    const desiredCP = Number(targetCP) || 0;
+    if (desiredCP < 10) {
+      const cp40 = calculateCP(species, ivAtk, ivDef, ivSta, 40);
+      return { level: 40, cpm: getCPMForLevel(40), badge: "Nv. 40", cp: cp40, presetId: "no_xl" };
+    }
+
     let bestEntry = FULL_CPM_LIST[0];
     let smallestCPDiff = Infinity;
+    let closestCP = 10;
 
     for (const entry of FULL_CPM_LIST) {
       const cpAtLevel = calculateCP(species, ivAtk, ivDef, ivSta, entry.cpm);
@@ -115,6 +133,7 @@
       if (diff < smallestCPDiff) {
         smallestCPDiff = diff;
         bestEntry = entry;
+        closestCP = cpAtLevel;
       }
     }
 
@@ -132,6 +151,10 @@
     return {
       level: bestEntry.level,
       cpm: bestEntry.cpm,
+      badge: `Nv. ${bestEntry.level}`,
+      cp: closestCP,
+      exactMatch: smallestCPDiff === 0,
+      diff: smallestCPDiff,
       presetId: bestPreset.id
     };
   }
@@ -209,10 +232,23 @@
     const ivSta = Math.min(15, Math.max(0, Number(rawEntry.ivSta ?? 15)));
     const ivPct = Math.round(((ivAtk + ivDef + ivSta) / 45) * 1000) / 10;
 
-    const presetObj =
-      db.levelPresets.find((p) => p.id === rawEntry.levelPreset) || db.levelPresets[2];
-    const level = Number(rawEntry.level) || presetObj.level;
-    const cpm = getCPMForLevel(level);
+    let level, cpm, presetId, cp;
+    const targetCP = rawEntry.cp ? Number(rawEntry.cp) : (rawEntry.customCP ? Number(rawEntry.customCP) : null);
+
+    if (targetCP && targetCP >= 10) {
+      const est = estimateLevelFromCP(species, ivAtk, ivDef, ivSta, targetCP);
+      level = est.level;
+      cpm = est.cpm;
+      presetId = est.presetId;
+      cp = targetCP;
+    } else {
+      const presetObj =
+        db.levelPresets.find((p) => p.id === rawEntry.levelPreset) || db.levelPresets[2];
+      level = Number(rawEntry.level) || presetObj.level;
+      cpm = getCPMForLevel(level);
+      presetId = presetObj.id;
+      cp = calculateCP(species, ivAtk, ivDef, ivSta, cpm);
+    }
 
     const baseAtkWithIV = species.baseStats.atk + ivAtk;
     const baseDefWithIV = species.baseStats.def + ivDef;
@@ -230,10 +266,6 @@
       ? realDef * db.combatModifiers.shadowDefenseMultiplier
       : realDef;
 
-    const cp = rawEntry.customCP
-      ? Number(rawEntry.customCP)
-      : calculateCP(species, ivAtk, ivDef, ivSta, cpm);
-
     const fastMoveObj =
       db.fastMoves[rawEntry.fastMove] || db.fastMoves[species.fastMoves[0]];
     const chargedMoveObj =
@@ -250,7 +282,7 @@
       ivSta,
       ivPct,
       level,
-      levelPreset: presetObj.id,
+      levelPreset: presetId,
       levelBadge: `Nv. ${level}`,
       cpm,
       cp,
@@ -373,14 +405,15 @@
 
       let level = Number(entryData.level) || 40;
       let levelPreset = entryData.levelPreset || "no_xl";
+      const targetCP = entryData.cp ? Number(entryData.cp) : (entryData.customCP ? Number(entryData.customCP) : null);
 
-      if (entryData.customCP && Number(entryData.customCP) >= 10) {
+      if (targetCP && targetCP >= 10) {
         const estimated = estimateLevelFromCP(
           species,
           entryData.ivAtk ?? 15,
           entryData.ivDef ?? 15,
           entryData.ivSta ?? 15,
-          Number(entryData.customCP)
+          targetCP
         );
         level = estimated.level;
         levelPreset = estimated.presetId;
@@ -402,7 +435,8 @@
         ivSta: Math.min(15, Math.max(0, Number(entryData.ivSta ?? 15))),
         levelPreset,
         level,
-        customCP: entryData.customCP ? Number(entryData.customCP) : null,
+        cp: targetCP || null,
+        customCP: targetCP || null,
         fastMove: entryData.fastMove || species.fastMoves[0],
         chargedMove: entryData.chargedMove || species.chargedMoves[0],
         isShadow: Boolean(entryData.isShadow && species.canBeShadow),
@@ -428,14 +462,15 @@
 
       let level = Number(updatedData.level) || rawList[index].level || 40;
       let levelPreset = updatedData.levelPreset || rawList[index].levelPreset || "no_xl";
+      const targetCP = updatedData.cp ? Number(updatedData.cp) : (updatedData.customCP ? Number(updatedData.customCP) : null);
 
-      if (updatedData.customCP && Number(updatedData.customCP) >= 10) {
+      if (targetCP && targetCP >= 10) {
         const estimated = estimateLevelFromCP(
           species,
           updatedData.ivAtk ?? 15,
           updatedData.ivDef ?? 15,
           updatedData.ivSta ?? 15,
-          Number(updatedData.customCP)
+          targetCP
         );
         level = estimated.level;
         levelPreset = estimated.presetId;
@@ -458,7 +493,8 @@
         ivSta: Math.min(15, Math.max(0, Number(updatedData.ivSta ?? 15))),
         levelPreset,
         level,
-        customCP: updatedData.customCP ? Number(updatedData.customCP) : null,
+        cp: targetCP || null,
+        customCP: targetCP || null,
         fastMove: updatedData.fastMove || species.fastMoves[0],
         chargedMove: updatedData.chargedMove || species.chargedMoves[0],
         isShadow: Boolean(updatedData.isShadow && species.canBeShadow),

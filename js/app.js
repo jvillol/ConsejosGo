@@ -20,6 +20,9 @@
     friendship: "best",
     megaBonus: "none",
     weatherBoost: false,
+    randomAlliesHigh: 0,
+    randomAlliesMid: 0,
+    randomAlliesLow: 0,
     boxFilterQuery: "",
     boxFilterTag: "all",
     boxSort: "pc_desc",
@@ -306,30 +309,63 @@
     });
 
     function applyQuickPreset(type) {
+      const species = global.PokeBoxManager.getSpeciesById(speciesSelect.value);
       if (type === "hundo_50") {
         ivAtkInput.value = 15;
         ivDefInput.value = 15;
         ivStaInput.value = 15;
-        presetSelect.value = "maxed"; // Nv 50
-        customCpInput.value = "";
+        presetSelect.value = "maxed";
+        if (species) {
+          customCpInput.value = global.PokeBoxManager.calculateCP(species, 15, 15, 15, 50);
+        }
       } else if (type === "raid_40") {
         ivAtkInput.value = 15;
         ivDefInput.value = 14;
         ivStaInput.value = 14;
-        presetSelect.value = "no_xl"; // Nv 40
-        customCpInput.value = "";
+        presetSelect.value = "no_xl";
+        if (species) {
+          customCpInput.value = global.PokeBoxManager.calculateCP(species, 15, 14, 14, 40);
+        }
       } else if (type === "caught_20") {
         ivAtkInput.value = 12;
         ivDefInput.value = 12;
         ivStaInput.value = 12;
-        presetSelect.value = "caught"; // Nv 20-25
-        customCpInput.value = "";
+        presetSelect.value = "caught";
+        if (species) {
+          customCpInput.value = global.PokeBoxManager.calculateCP(species, 12, 12, 12, 20);
+        }
       } else if (type === "hundo_only") {
         ivAtkInput.value = 15;
         ivDefInput.value = 15;
         ivStaInput.value = 15;
       }
       updateFormLivePreview();
+    }
+
+    const btnFill40 = document.getElementById("btn-fill-cp-40");
+    if (btnFill40) {
+      btnFill40.addEventListener("click", () => {
+        const species = global.PokeBoxManager.getSpeciesById(speciesSelect.value);
+        if (!species) return;
+        const atk = Number(ivAtkInput.value);
+        const def = Number(ivDefInput.value);
+        const sta = Number(ivStaInput.value);
+        customCpInput.value = global.PokeBoxManager.calculateCP(species, atk, def, sta, 40);
+        updateFormLivePreview();
+      });
+    }
+
+    const btnFill50 = document.getElementById("btn-fill-cp-50");
+    if (btnFill50) {
+      btnFill50.addEventListener("click", () => {
+        const species = global.PokeBoxManager.getSpeciesById(speciesSelect.value);
+        if (!species) return;
+        const atk = Number(ivAtkInput.value);
+        const def = Number(ivDefInput.value);
+        const sta = Number(ivStaInput.value);
+        customCpInput.value = global.PokeBoxManager.calculateCP(species, atk, def, sta, 50);
+        updateFormLivePreview();
+      });
     }
 
     function getFilteredBoxSpecies(filterText = "") {
@@ -525,6 +561,7 @@
 
       const customCPVal = Number(customCpInput.value);
       const cpBadge = document.getElementById("preview-cp-badge");
+      const statsPreview = document.getElementById("calculated-stats-preview");
 
       if (customCPVal && customCPVal >= 10) {
         const est = global.PokeBoxManager.estimateLevelFromCP(
@@ -535,19 +572,25 @@
           customCPVal
         );
         presetSelect.value = est.presetId;
-        cpBadge.textContent = `PC ${customCPVal} (~Nv. ${est.level})`;
+        cpBadge.textContent = `Nivel: Nv. ${est.level}`;
+        cpBadge.className = "px-2.5 py-0.5 rounded-full font-mono text-xs font-extrabold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40";
+        if (statsPreview) {
+          const realAtk = Math.round((species.baseStats.atk + ivAtk) * est.cpm * 10) / 10;
+          const realDef = Math.round((species.baseStats.def + ivDef) * est.cpm * 10) / 10;
+          const realHP = Math.max(10, Math.floor((species.baseStats.sta + ivSta) * est.cpm));
+          statsPreview.textContent = `Atk: ${realAtk} · Def: ${realDef} · PS: ${realHP}`;
+        }
       } else {
-        const presetObj =
-          db.levelPresets.find((p) => p.id === presetSelect.value) ||
-          db.levelPresets[2];
         const calcCP = global.PokeBoxManager.calculateCP(
           species,
           ivAtk,
           ivDef,
           ivSta,
-          presetObj.cpm
+          40
         );
-        cpBadge.textContent = `PC ~${calcCP} (${presetObj.badge})`;
+        cpBadge.textContent = `Escribe los PC (Nv. 40 sería ~${calcCP})`;
+        cpBadge.className = "px-2.5 py-0.5 rounded-full font-mono text-[11px] font-bold bg-slate-800 text-slate-400 border border-slate-700";
+        if (statsPreview) statsPreview.textContent = "";
       }
     }
 
@@ -587,15 +630,24 @@
       const ownerSelect = document.getElementById("select-form-owner");
       const ownerId = ownerSelect ? ownerSelect.value : "me";
 
+      const species = global.PokeBoxManager.getSpeciesById(speciesSelect.value);
+      const atk = Number(ivAtkInput.value);
+      const def = Number(ivDefInput.value);
+      const sta = Number(ivStaInput.value);
+      const cpVal = customCpInput.value
+        ? Number(customCpInput.value)
+        : (species ? global.PokeBoxManager.calculateCP(species, atk, def, sta, 40) : 3000);
+
       const payload = {
         ownerId,
         pokemonId: speciesSelect.value,
         nickname: document.getElementById("input-box-nickname").value,
-        ivAtk: Number(ivAtkInput.value),
-        ivDef: Number(ivDefInput.value),
-        ivSta: Number(ivStaInput.value),
+        ivAtk: atk,
+        ivDef: def,
+        ivSta: sta,
         levelPreset: presetSelect.value,
-        customCP: customCpInput.value ? Number(customCpInput.value) : null,
+        cp: cpVal,
+        customCP: cpVal,
         fastMove: document.getElementById("select-box-fast").value,
         chargedMove: document.getElementById("select-box-charged").value,
         isShadow: document.getElementById("toggle-box-shadow").checked,
@@ -1374,6 +1426,39 @@
       runOptimizerCalculation();
     });
 
+    // Steppers para Compañeros Aleatorios (Gente Random en la sala)
+    const randomStepperBtns = document.querySelectorAll(".random-stepper-btn");
+    randomStepperBtns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const target = btn.getAttribute("data-target");
+        const delta = Number(btn.getAttribute("data-delta")) || 0;
+
+        if (target === "random-allies-high") {
+          state.randomAlliesHigh = Math.max(0, Math.min(20, state.randomAlliesHigh + delta));
+          const el = document.getElementById("label-random-allies-high");
+          if (el) el.textContent = state.randomAlliesHigh;
+        } else if (target === "random-allies-mid") {
+          state.randomAlliesMid = Math.max(0, Math.min(20, state.randomAlliesMid + delta));
+          const el = document.getElementById("label-random-allies-mid");
+          if (el) el.textContent = state.randomAlliesMid;
+        } else if (target === "random-allies-low") {
+          state.randomAlliesLow = Math.max(0, Math.min(20, state.randomAlliesLow + delta));
+          const el = document.getElementById("label-random-allies-low");
+          if (el) el.textContent = state.randomAlliesLow;
+        }
+
+        const total = state.randomAlliesHigh + state.randomAlliesMid + state.randomAlliesLow;
+        const summaryWrap = document.getElementById("random-allies-summary");
+        const countTotal = document.getElementById("random-allies-count-total");
+        if (summaryWrap && countTotal) {
+          summaryWrap.classList.toggle("hidden", total <= 0);
+          countTotal.textContent = total;
+        }
+
+        runOptimizerCalculation();
+      });
+    });
+
     runBtn.addEventListener("click", () => {
       runOptimizerCalculation();
     });
@@ -1410,7 +1495,12 @@
         partySize: state.partySize,
         friendship: state.friendship,
         megaBonus: state.megaBonus,
-        weatherBoost: state.weatherBoost
+        weatherBoost: state.weatherBoost,
+        randomAllies: {
+          high: state.randomAlliesHigh || 0,
+          mid: state.randomAlliesMid || 0,
+          low: state.randomAlliesLow || 0
+        }
       },
       state.activeCombatFriendIds
     );
@@ -1465,11 +1555,19 @@
   }
 
   function renderCalculationResults(plan) {
-    const { personalMetrics, scenarios, team, battleMode, bossProfile, missingMaxWarning, friendsBreakdown } = plan;
+    const { personalMetrics, scenarios, team, battleMode, bossProfile, missingMaxWarning, friendsBreakdown, randomMetrics } = plan;
+
+    // Actualizar resumen visual de Gente Random
+    const randomDamageLabel = document.getElementById("random-allies-damage-total");
+    if (randomDamageLabel && randomMetrics) {
+      randomDamageLabel.textContent = `+${randomMetrics.pct}% Daño Estimado`;
+    }
 
     const verdictBadge = document.getElementById("verdict-badge");
     if (personalMetrics.canBeatWithFriends) {
-      if (friendsBreakdown.length > 0) {
+      if (randomMetrics && randomMetrics.totalCount > 0) {
+        verdictBadge.textContent = "🎉 ¡VICTORIA CON TU GRUPO + RANDOMS!";
+      } else if (friendsBreakdown.length > 0) {
         verdictBadge.textContent = "🎉 ¡VICTORIA CON TU GRUPO DE AMIGOS!";
       } else {
         verdictBadge.textContent = "🏆 ¡SOLABLE EN SOLITARIO!";
@@ -1500,19 +1598,26 @@
 
     document.getElementById("direct-recommendation-text").textContent = plan.directRecommendation;
 
-    // Sección de amigos fijos activos aportando al combate
+    // Sección de desglose de participantes (Yo + Amigos Fijos + Gente Random)
     const friendsContributionWrap = document.getElementById("friends-contribution-summary");
     if (friendsContributionWrap) {
-      if (friendsBreakdown.length > 0) {
+      const hasRandoms = randomMetrics && randomMetrics.totalCount > 0;
+      if (friendsBreakdown.length > 0 || hasRandoms) {
         friendsContributionWrap.classList.remove("hidden");
+
+        const randomTiersText = [];
+        if (randomMetrics.highCount > 0) randomTiersText.push(`${randomMetrics.highCount} Nv. Alto`);
+        if (randomMetrics.midCount > 0) randomTiersText.push(`${randomMetrics.midCount} Nv. Medio`);
+        if (randomMetrics.lowCount > 0) randomTiersText.push(`${randomMetrics.lowCount} Nv. Bajo`);
+
         friendsContributionWrap.innerHTML = `
-          <div class="p-3.5 rounded-xl bg-indigo-950/40 border border-indigo-500/40 space-y-2">
+          <div class="p-3.5 rounded-xl bg-indigo-950/40 border border-indigo-500/40 space-y-2.5">
             <span class="text-xs font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
-              <span>👥 Aporte de tus Amigos Fijos Seleccionados:</span>
+              <span>👥 Desglose de Jugadores en tu Sala:</span>
             </span>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
               <div class="p-2 rounded-lg bg-slate-900/80 border border-slate-800 text-xs">
-                <span class="text-slate-400">👤 Tu Aporte Personal:</span>
+                <span class="text-slate-400">👤 Tu Equipo Personal:</span>
                 <strong class="text-cyan-300 block font-mono text-sm">${personalMetrics.personalDamagePct}% (${personalMetrics.personalDamage.toLocaleString()} HP)</strong>
               </div>
               ${friendsBreakdown
@@ -1529,6 +1634,12 @@
                 `;
                 })
                 .join("")}
+              ${hasRandoms ? `
+                <div class="p-2 rounded-lg bg-slate-900/80 border border-cyan-500/40 text-xs">
+                  <span class="text-slate-400">🎲 Randoms (${randomTiersText.join(", ")}):</span>
+                  <strong class="text-emerald-300 block font-mono text-sm">+${randomMetrics.pct}% (${randomMetrics.totalDamage.toLocaleString()} HP)</strong>
+                </div>
+              ` : ""}
             </div>
           </div>
         `;
