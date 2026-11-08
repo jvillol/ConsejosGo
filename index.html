@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PokéRaid & Max Optimizer | Calculadora PvE, Dinamax y Gigamax</title>
+
+  <!-- TailwindCSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            display: ['Orbitron', 'sans-serif'],
+            sans: ['Plus Jakarta Sans', 'Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace']
+          },
+          colors: {
+            dex: {
+              bg: '#090d16',
+              panel: '#111827',
+              card: '#1e293b',
+              border: '#334155',
+              red: '#ef4444',
+              cyan: '#06b6d4',
+              max: '#ec4899',
+              purple: '#a855f7'
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Orbitron:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Estilos Personalizados -->
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+
+<body class="text-slate-100 font-sans min-h-screen flex flex-col selection:bg-pink-500 selection:text-white">
+
+  <!-- ========================================================================
+       HEADER SUPERIOR ESTILO POKÉDEX / DYNAMAX HUD
+       ======================================================================== -->
+  <header class="sticky top-0 z-40 backdrop-blur-xl bg-slate-950/85 border-b border-slate-800/90 shadow-2xl">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-4">
+      
+      <!-- Logo & LEDs Pokédex -->
+      <div class="flex items-center gap-3.5">
+        <div class="relative flex items-center justify-center w-11 h-11 rounded-full bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-700 p-0.5 shadow-lg shadow-cyan-500/30 border-2 border-slate-200/80">
+          <div class="w-full h-full rounded-full bg-gradient-to-tr from-cyan-600 to-cyan-300 flex items-center justify-center">
+            <span class="w-3 h-3 rounded-full bg-white/90 animate-ping"></span>
+          </div>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-display text-lg sm:text-xl font-extrabold tracking-wider bg-gradient-to-r from-white via-cyan-200 to-pink-400 bg-clip-text text-transparent">
+              POKÉRAID <span class="text-pink-500">&amp; MAX</span> OPTIMIZER
+            </h1>
+            <span class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-widest bg-pink-500/20 text-pink-300 border border-pink-500/40">
+              v2.5 META
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">
+            Motor Matemático PvE · Incursiones · Dinamax &amp; Gigamax (Eternatus &amp; Duraludon Ready)
+          </p>
+        </div>
+      </div>
+
+      <!-- Indicadores Rápidos y Botones Globales -->
+      <div class="flex items-center gap-2 sm:gap-3">
+        <!-- Contador de Mi Caja -->
+        <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/80 text-xs">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span class="text-slate-400">Mi Caja:</span>
+          <strong id="header-box-count" class="font-mono text-cyan-300 text-sm">0</strong>
+          <span class="text-slate-500 hidden md:inline">Pokémon</span>
+        </div>
+
+        <!-- Botón Cargar Caja Demo Meta -->
+        <button
+          id="btn-load-demo-box"
+          type="button"
+          class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-pink-600/80 to-purple-600/80 hover:from-pink-500 hover:to-purple-500 text-white border border-pink-400/40 shadow-md shadow-pink-500/10 transition flex items-center gap-1.5"
+          title="Carga un equipo de prueba con Eternatus, Duraludon Gigamax, Groudon Primigenio, Excadrill Dinamax y más"
+        >
+          <span>⚡</span>
+          <span>Cargar Caja Demo</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Barra de Navegación por Pestañas (Tabs) -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-1 sm:gap-2 overflow-x-auto border-t border-slate-800/60 pt-2">
+      <button
+        type="button"
+        data-tab-target="tab-optimizer"
+        class="nav-tab-btn active-tab px-4 py-2.5 rounded-t-xl text-xs sm:text-sm font-bold tracking-wide flex items-center gap-2 border-b-2 border-pink-500 bg-slate-900/90 text-white transition whitespace-nowrap"
+      >
+        <span>⚔️</span>
+        <span>Optimizador de Jefe &amp; Calculadora</span>
+      </button>
+
+      <button
+        type="button"
+        data-tab-target="tab-box"
+        class="nav-tab-btn px-4 py-2.5 rounded-t-xl text-xs sm:text-sm font-semibold tracking-wide flex items-center gap-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/50 transition whitespace-nowrap"
+      >
+        <span>📦</span>
+        <span>Mi Caja Pokémon</span>
+        <span id="tab-box-badge" class="px-1.5 py-0.2 rounded-full text-[11px] font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">0</span>
+      </button>
+
+      <button
+        type="button"
+        data-tab-target="tab-pokedex"
+        class="nav-tab-btn px-4 py-2.5 rounded-t-xl text-xs sm:text-sm font-semibold tracking-wide flex items-center gap-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/50 transition whitespace-nowrap"
+      >
+        <span>🧬</span>
+        <span>Base de Datos Meta &amp; Gigamax</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ========================================================================
+       CONTENIDO PRINCIPAL
+       ======================================================================== -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
+
+    <!-- ======================================================================
+         VISTA 1: OPTIMIZADOR DE JEFE Y CALCULADORA (MÓDULOS 2 Y 3)
+         ====================================================================== -->
+    <section id="tab-optimizer" class="tab-panel space-y-6">
+      
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+        <!-- COLUMNA IZQUIERDA (5 cols): SELECTOR DE JEFE Y CONDICIONES (MÓDULO 2) -->
+        <div class="lg:col-span-5 space-y-5">
+          
+          <!-- Tarjeta de Selección de Combate y Jefe -->
+          <div class="bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-2xl p-5 shadow-xl relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-36 h-36 bg-pink-500/10 rounded-full blur-2xl pointer-events-none"></div>
+
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="font-display text-sm sm:text-base font-bold uppercase tracking-wider text-cyan-300 flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+                1. Jefe y Modalidad de Combate
+              </h2>
+              <span id="battle-category-pill" class="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold uppercase bg-pink-500/20 text-pink-300 border border-pink-500/40">
+                RAID / MAX
+              </span>
+            </div>
+
+            <div class="space-y-4">
+              <!-- Selector del Tipo de Combate -->
+              <div>
+                <label for="select-battle-mode" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Tipo de Incursión / Combate Max
+                </label>
+                <select
+                  id="select-battle-mode"
+                  class="w-full rounded-xl bg-slate-950/90 border border-slate-700/80 px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition"
+                >
+                  <!-- Se puebla dinámicamente desde POKE_DB.battleModes -->
+                </select>
+                <p id="battle-mode-desc" class="mt-1.5 text-xs text-slate-400 leading-relaxed">
+                  Selecciona el nivel de incursión o combate Dinamax/Gigamax.
+                </p>
+              </div>
+
+              <!-- Selector del Jefe a enfrentar -->
+              <div>
+                <label for="select-boss-pokemon" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Jefe a Enfrentar
+                </label>
+                <select
+                  id="select-boss-pokemon"
+                  class="w-full rounded-xl bg-slate-950/90 border border-slate-700/80 px-3.5 py-2.5 text-sm font-semibold text-white focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition"
+                >
+                  <!-- Se puebla dinámicamente desde POKE_DB.pokemon -->
+                </select>
+              </div>
+
+              <!-- Selectores opcionales de Movimientos del Jefe -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label for="select-boss-fast" class="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                    Ataque Rápido del Jefe
+                  </label>
+                  <select
+                    id="select-boss-fast"
+                    class="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+                  ></select>
+                </div>
+                <div>
+                  <label for="select-boss-charged" class="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                    Ataque Cargado del Jefe
+                  </label>
+                  <select
+                    id="select-boss-charged"
+                    class="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+                  ></select>
+                </div>
+              </div>
+
+              <!-- Resumen del Jefe Seleccionado (Tipos, Debilidades, PS, Reloj) -->
+              <div id="boss-summary-card" class="mt-3 p-4 rounded-xl bg-slate-950/90 border border-slate-800/90 space-y-3">
+                <div class="flex items-center justify-between gap-2">
+                  <div>
+                    <span class="text-[11px] font-mono uppercase text-slate-400" id="boss-dex-label">#890</span>
+                    <h3 id="boss-name-display" class="text-base font-extrabold text-white">Eternatus</h3>
+                  </div>
+                  <div id="boss-types-badges" class="flex items-center gap-1.5"></div>
+                </div>
+
+                <!-- Estadísticas del Jefe en este Modo -->
+                <div class="grid grid-cols-3 gap-2 text-center bg-slate-900/90 rounded-lg p-2 border border-slate-800/70">
+                  <div>
+                    <span class="block text-[10px] uppercase text-slate-400">PS del Jefe</span>
+                    <strong id="boss-hp-display" class="font-mono text-xs sm:text-sm text-pink-400">27.000 HP</strong>
+                  </div>
+                  <div>
+                    <span class="block text-[10px] uppercase text-slate-400">Tiempo Límite</span>
+                    <strong id="boss-time-display" class="font-mono text-xs sm:text-sm text-cyan-300">300s</strong>
+                  </div>
+                  <div>
+                    <span class="block text-[10px] uppercase text-slate-400">Tamaño Equipo</span>
+                    <strong id="boss-teamsize-display" class="font-mono text-xs sm:text-sm text-emerald-400">3 Max / 6 Raid</strong>
+                  </div>
+                </div>
+
+                <!-- Debilidades x2.56 y x1.6 -->
+                <div>
+                  <span class="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                    Debilidades Elementales (Multiplicador PoGO):
+                  </span>
+                  <div id="boss-weaknesses-list" class="flex flex-wrap gap-1.5"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tarjeta de Modificadores y Condiciones de Combate -->
+          <div class="bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+            <h2 class="font-display text-sm sm:text-base font-bold uppercase tracking-wider text-pink-400 flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-pink-500"></span>
+              2. Modificadores de Combate
+            </h2>
+
+            <!-- Juego en Equipo (Party Power) -->
+            <div id="party-power-container" class="p-3.5 rounded-xl bg-gradient-to-r from-indigo-950/70 via-slate-900 to-purple-950/60 border border-indigo-500/40 space-y-3">
+              <div class="flex items-center justify-between">
+                <div>
+                  <label for="toggle-party-power" class="text-sm font-bold text-indigo-200 flex items-center gap-2 cursor-pointer">
+                    <span>⚡ Juego en Equipo (Party Power)</span>
+                  </label>
+                  <p class="text-[11px] text-slate-400">
+                    Duplica (x2.0) el daño de tus próximos ataques cargados según miembros en la Party.
+                  </p>
+                </div>
+                <input
+                  id="toggle-party-power"
+                  type="checkbox"
+                  checked
+                  class="w-5 h-5 accent-pink-500 rounded cursor-pointer"
+                />
+              </div>
+
+              <div id="party-size-selector-wrap" class="pt-1">
+                <label class="block text-[11px] font-semibold uppercase tracking-wider text-indigo-300 mb-1.5">
+                  Miembros en tu Party
+                </label>
+                <div class="grid grid-cols-3 gap-2">
+                  <button type="button" data-party-size="2" class="party-size-btn py-1.5 px-2 rounded-lg text-xs font-bold border border-indigo-500/50 bg-indigo-600/30 text-white">
+                    2 Jugadores
+                  </button>
+                  <button type="button" data-party-size="3" class="party-size-btn py-1.5 px-2 rounded-lg text-xs font-semibold border border-slate-700 bg-slate-900 text-slate-300 hover:border-indigo-400">
+                    3 Jugadores
+                  </button>
+                  <button type="button" data-party-size="4" class="party-size-btn py-1.5 px-2 rounded-lg text-xs font-semibold border border-slate-700 bg-slate-900 text-slate-300 hover:border-indigo-400">
+                    4 Jugadores
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Nivel de Amistad -->
+            <div>
+              <label for="select-friendship" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                Nivel de Amistad en el Lobby
+              </label>
+              <select
+                id="select-friendship"
+                class="w-full rounded-xl bg-slate-950 border border-slate-700/80 px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-400"
+              >
+                <option value="none">Sin Amistad (1.00x)</option>
+                <option value="good">Buen Amigo (+3% / 1.03x)</option>
+                <option value="great">Gran Amigo (+5% / 1.05x)</option>
+                <option value="ultra">Ultra Amigo (+7% / 1.07x)</option>
+                <option value="best" selected>Mejor Amigo (+10% / 1.10x)</option>
+              </select>
+            </div>
+
+            <!-- Bono de Mega Activa en el Grupo -->
+            <div>
+              <label for="select-mega-bonus" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                Bono de Megaevolución / Primigenio Aliado
+              </label>
+              <select
+                id="select-mega-bonus"
+                class="w-full rounded-xl bg-slate-950 border border-slate-700/80 px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-400"
+              >
+                <option value="none" selected>Sin Mega aliada activa (0%)</option>
+                <option value="diff">Mega activa en el grupo (+10% daño general)</option>
+                <option value="same">Mega / Primigenio del mismo tipo (+30% daño)</option>
+              </select>
+            </div>
+
+            <!-- Clima a Favor -->
+            <div class="flex items-center justify-between p-3 rounded-xl bg-slate-950/80 border border-slate-800">
+              <div>
+                <label for="toggle-weather-boost" class="text-sm font-semibold text-slate-200 cursor-pointer">
+                  ☀️ Clima a Favor (+20% Daño)
+                </label>
+                <p class="text-[11px] text-slate-400">
+                  Aplica el multiplicador climático x1.20 a tus ataques eficaces.
+                </p>
+              </div>
+              <input
+                id="toggle-weather-boost"
+                type="checkbox"
+                class="w-5 h-5 accent-cyan-400 rounded cursor-pointer"
+              />
+            </div>
+
+            <!-- Botón Recalcular -->
+            <button
+              id="btn-run-optimizer"
+              type="button"
+              class="w-full py-3 px-4 rounded-xl font-display font-bold text-sm uppercase tracking-wider bg-gradient-to-r from-cyan-500 via-blue-600 to-pink-600 hover:from-cyan-400 hover:to-pink-500 text-white shadow-lg shadow-pink-500/20 transition transform active:scale-[0.99]"
+            >
+              ⚡ Calcular Equipo Ideal y Jugadores
+            </button>
+          </div>
+
+        </div>
+
+        <!-- COLUMNA DERECHA (7 cols): RESULTADOS DEL MOTOR Y JUGADORES (MÓDULO 3) -->
+        <div class="lg:col-span-7 space-y-6">
+
+          <!-- Panel Resumen de Veredicto Directo y Contribución Personal -->
+          <div class="bg-slate-900/95 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-2xl relative overflow-hidden">
+            <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+              <div>
+                <span class="text-xs font-mono uppercase tracking-widest text-pink-400 font-semibold">
+                  Diagnóstico Táctico en Tiempo Real
+                </span>
+                <h2 class="font-display text-lg sm:text-xl font-extrabold text-white mt-0.5">
+                  Tu Aporte de Daño &amp; Escenarios de Lobby
+                </h2>
+              </div>
+
+              <!-- Badge de Estado Solable / Necesita Grupo -->
+              <div id="verdict-badge" class="px-3.5 py-1.5 rounded-xl font-mono text-xs font-bold uppercase tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                Analizando Caja...
+              </div>
+            </div>
+
+            <!-- Barra de Contribución Personal de Daño (% de la Vida del Jefe) -->
+            <div class="mt-5 space-y-2">
+              <div class="flex items-baseline justify-between">
+                <span class="text-xs sm:text-sm font-semibold text-slate-300">
+                  Porcentaje de Vida del Jefe que bajas tú solo:
+                </span>
+                <div class="flex items-baseline gap-2">
+                  <strong id="personal-damage-pct" class="font-mono text-2xl sm:text-3xl font-extrabold text-cyan-300">0.0%</strong>
+                  <span id="personal-damage-raw" class="text-xs font-mono text-slate-400">(0 / 15.000 HP)</span>
+                </div>
+              </div>
+
+              <!-- Barra de progreso visual -->
+              <div class="w-full h-4 rounded-full bg-slate-950 border border-slate-800 overflow-hidden p-0.5">
+                <div
+                  id="personal-damage-bar"
+                  class="h-full rounded-full bg-gradient-to-r from-cyan-500 via-blue-500 to-pink-500 transition-all duration-500"
+                  style="width: 0%"
+                ></div>
+              </div>
+
+              <!-- Métricas Técnicas: DPS del Equipo, TDO Total y Multiplicador Global -->
+              <div class="grid grid-cols-3 gap-3 pt-2">
+                <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-800/80">
+                  <span class="block text-[11px] uppercase text-slate-400">Tu DPS Promedio</span>
+                  <strong id="metric-team-dps" class="font-mono text-base sm:text-lg text-white">0.0 /s</strong>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-800/80">
+                  <span class="block text-[11px] uppercase text-slate-400">Daño Total (TDO)</span>
+                  <strong id="metric-team-tdo" class="font-mono text-base sm:text-lg text-pink-400">0 HP</strong>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-800/80">
+                  <span class="block text-[11px] uppercase text-slate-400">Bonificador Activo</span>
+                  <strong id="metric-active-mult" class="font-mono text-base sm:text-lg text-emerald-400">x1.00</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- Frase Directa de Recomendación (Requisito clave Módulo 3) -->
+            <div class="mt-5 p-4 rounded-xl bg-gradient-to-r from-slate-950 via-indigo-950/60 to-slate-950 border border-indigo-500/40">
+              <p id="direct-recommendation-text" class="text-sm sm:text-base text-slate-100 leading-relaxed font-medium">
+                Cargando el motor matemático...
+              </p>
+            </div>
+
+            <!-- Desglose Visual de Jugadores Necesarios en 3 Escenarios -->
+            <div class="mt-5">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
+                Compañeros Adicionales Necesarios Según su Nivel de Preparación:
+              </h3>
+
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <!-- Escenario 1: Hardcore -->
+                <div class="p-4 rounded-xl bg-emerald-950/30 border border-emerald-500/40 flex flex-col justify-between">
+                  <div>
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs font-bold uppercase tracking-wider text-emerald-300">🔥 Hardcore</span>
+                      <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">Nv. 40-50 Meta</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-1">
+                      Compañeros con Pokémon meta optimizados, ataques correctos y Party Power / Movimientos Max Nv. 3.
+                    </p>
+                  </div>
+                  <div class="mt-4 pt-3 border-t border-emerald-500/20 flex items-baseline justify-between">
+                    <span class="text-xs text-slate-300">Necesitas:</span>
+                    <strong id="scenario-hardcore-count" class="font-display text-xl font-extrabold text-emerald-300">+0</strong>
+                  </div>
+                </div>
+
+                <!-- Escenario 2: Estándar -->
+                <div class="p-4 rounded-xl bg-cyan-950/30 border border-cyan-500/40 flex flex-col justify-between">
+                  <div>
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs font-bold uppercase tracking-wider text-cyan-300">⚡ Estándar</span>
+                      <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300">Nv. 30-35</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-1">
+                      Compañeros con preparación media, buenos counters sin caramelos XL y ataques eficaces.
+                    </p>
+                  </div>
+                  <div class="mt-4 pt-3 border-t border-cyan-500/20 flex items-baseline justify-between">
+                    <span class="text-xs text-slate-300">Necesitas:</span>
+                    <strong id="scenario-standard-count" class="font-display text-xl font-extrabold text-cyan-300">+0</strong>
+                  </div>
+                </div>
+
+                <!-- Escenario 3: Casual -->
+                <div class="p-4 rounded-xl bg-amber-950/30 border border-amber-500/40 flex flex-col justify-between">
+                  <div>
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs font-bold uppercase tracking-wider text-amber-300">🛡️ Casual</span>
+                      <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">Nv. 20-25 Auto</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-1">
+                      Compañeros usando el equipo recomendado automáticamente por el juego y sin potenciar.
+                    </p>
+                  </div>
+                  <div class="mt-4 pt-3 border-t border-amber-500/20 flex items-baseline justify-between">
+                    <span class="text-xs text-slate-300">Necesitas:</span>
+                    <strong id="scenario-casual-count" class="font-display text-xl font-extrabold text-amber-300">+0</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Panel de Tu Equipo Ideal Recomendado de "Mi Caja" -->
+          <div class="bg-slate-900/95 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 class="font-display text-base sm:text-lg font-extrabold text-white flex items-center gap-2">
+                  <span>🏆</span>
+                  <span id="recommended-team-title">Tu Equipo Ideal Recomendado (Top 6 Incursión)</span>
+                </h2>
+                <p id="recommended-team-subtitle" class="text-xs text-slate-400 mt-0.5">
+                  Seleccionados automáticamente de "Mi Caja Pokémon" según DPS, eficacia de tipos y supervivencia.
+                </p>
+              </div>
+            </div>
+
+            <!-- Banner Explicativo de Estrategia Max (visible solo en Combates Dinamax / Gigamax) -->
+            <div id="max-strategy-banner" class="hidden p-3.5 rounded-xl bg-pink-950/40 border border-pink-500/40 text-xs text-pink-100 space-y-1">
+              <div class="font-bold text-pink-300 uppercase tracking-wider flex items-center gap-1.5">
+                <span>🌀 Estrategia de Patrulla Dinamax / Gigamax (3 Pokémon):</span>
+              </div>
+              <p class="text-slate-300">
+                <strong>Slots 1 y 2 (Tanques / Generadores de Medidor Max):</strong> Usa Pokémon resistentes con ataques rápidos de 0.5s para llenar el medidor rápido sin caer.
+                <strong>Slot 3 (Atacante Fase Max):</strong> Cámbialo justo al iniciar la cuenta atrás Dinamax/Gigamax para desatar sus 3 Ataques Max al máximo nivel.
+              </p>
+            </div>
+
+            <!-- Grid de Tarjetas del Equipo Recomendado -->
+            <div id="recommended-team-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <!-- Se renderiza dinámicamente en la Fase 2 -->
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ======================================================================
+         VISTA 2: MI CAJA POKÉMON (MÓDULO 1 - CRUD CON LOCALSTORAGE)
+         ====================================================================== -->
+    <section id="tab-box" class="tab-panel hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+        <!-- FORMULARIO PARA AÑADIR / EDITAR POKÉMON (5 cols) -->
+        <div class="lg:col-span-5 bg-slate-900/95 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h2 id="box-form-title" class="font-display text-base font-extrabold text-cyan-300 uppercase tracking-wider">
+              ➕ Añadir Pokémon a Mi Caja
+            </h2>
+            <button
+              id="btn-cancel-edit"
+              type="button"
+              class="hidden text-xs font-semibold text-rose-400 hover:text-rose-300 underline"
+            >
+              Cancelar edición
+            </button>
+          </div>
+
+          <form id="pokemon-box-form" class="space-y-4">
+            <input type="hidden" id="form-pokemon-uid" value="" />
+
+            <!-- Buscador / Autocompletado de Especie -->
+            <div>
+              <label for="input-species-search" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                Buscar o Filtrar Especie
+              </label>
+              <input
+                id="input-species-search"
+                type="text"
+                placeholder="Ej. Eternatus, Duraludon, Groudon, Excadrill..."
+                class="w-full rounded-xl bg-slate-950 border border-slate-700/80 px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 mb-2"
+              />
+              <label for="select-box-species" class="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                Especie Seleccionada
+              </label>
+              <select
+                id="select-box-species"
+                required
+                class="w-full rounded-xl bg-slate-950 border border-slate-700 px-3.5 py-2.5 text-sm font-semibold text-white focus:outline-none focus:border-cyan-400"
+              ></select>
+            </div>
+
+            <!-- Mote / Nombre Personalizado -->
+            <div>
+              <label for="input-box-nickname" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                Mote / Etiqueta (Opcional)
+              </label>
+              <input
+                id="input-box-nickname"
+                type="text"
+                placeholder="Ej. Eternatus 98% Cañón Max"
+                class="w-full rounded-xl bg-slate-950 border border-slate-700/80 px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+              />
+            </div>
+
+            <!-- IVs: Ataque, Defensa y PS (0 a 15) -->
+            <div class="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800 space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-300">IVs Individuales (0 - 15)</span>
+                <div class="flex items-center gap-2">
+                  <button type="button" id="btn-iv-hundo" class="text-[11px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30">
+                    15/15/15 (100%)
+                  </button>
+                  <span id="iv-percentage-badge" class="text-xs font-mono font-bold text-cyan-300">100%</span>
+                </div>
+              </div>
+
+              <!-- Ataque IV -->
+              <div>
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="text-slate-400">⚔️ IV Ataque</span>
+                  <strong id="label-iv-atk" class="font-mono text-rose-400">15</strong>
+                </div>
+                <input id="input-iv-atk" type="range" min="0" max="15" value="15" class="iv-slider w-full" />
+              </div>
+
+              <!-- Defensa IV -->
+              <div>
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="text-slate-400">🛡️ IV Defensa</span>
+                  <strong id="label-iv-def" class="font-mono text-cyan-400">15</strong>
+                </div>
+                <input id="input-iv-def" type="range" min="0" max="15" value="15" class="iv-slider w-full" />
+              </div>
+
+              <!-- PS IV -->
+              <div>
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="text-slate-400">❤️ IV PS (Stamina)</span>
+                  <strong id="label-iv-sta" class="font-mono text-emerald-400">15</strong>
+                </div>
+                <input id="input-iv-sta" type="range" min="0" max="15" value="15" class="iv-slider w-full" />
+              </div>
+            </div>
+
+            <!-- Estado de Mejora / Nivel Aproximado o Cálculo mediante PC -->
+            <div class="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800 space-y-3">
+              <div class="flex items-center justify-between">
+                <label for="select-level-preset" class="text-xs font-bold uppercase tracking-wider text-slate-300">
+                  Estado de Mejora / Nivel
+                </label>
+                <span id="preview-cp-badge" class="px-2.5 py-0.5 rounded-full font-mono text-xs font-extrabold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                  PC ~4429
+                </span>
+              </div>
+
+              <select
+                id="select-level-preset"
+                class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-xs sm:text-sm text-white focus:outline-none focus:border-cyan-400"
+              >
+                <!-- Se puebla desde POKE_DB.levelPresets -->
+              </select>
+
+              <div class="pt-1 border-t border-slate-800/80 flex items-center justify-between gap-3">
+                <label for="input-custom-cp" class="text-[11px] text-slate-400">
+                  ¿Prefieres introducir sus <strong>PC exactos</strong> para estimar el nivel automáticamente?
+                </label>
+                <input
+                  id="input-custom-cp"
+                  type="number"
+                  min="10"
+                  max="7000"
+                  placeholder="PC opcional"
+                  class="w-28 rounded-lg bg-slate-900 border border-slate-700 px-2.5 py-1.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                />
+              </div>
+            </div>
+
+            <!-- Movimientos Rápido y Cargado -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label for="select-box-fast" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                  Ataque Rápido
+                </label>
+                <select
+                  id="select-box-fast"
+                  class="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-xs sm:text-sm text-white focus:outline-none focus:border-cyan-400"
+                ></select>
+              </div>
+              <div>
+                <label for="select-box-charged" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                  Ataque Cargado
+                </label>
+                <select
+                  id="select-box-charged"
+                  class="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-xs sm:text-sm text-white focus:outline-none focus:border-cyan-400"
+                ></select>
+              </div>
+            </div>
+
+            <!-- Opciones Adicionales: Oscuro (Shadow) y Dinamax / Gigamax -->
+            <div class="space-y-3 pt-1">
+              <!-- Toggle Oscuro -->
+              <div class="flex items-center justify-between p-3 rounded-xl bg-purple-950/30 border border-purple-500/40">
+                <div>
+                  <label for="toggle-box-shadow" class="text-xs sm:text-sm font-bold text-purple-300 cursor-pointer flex items-center gap-1.5">
+                    <span>🟣 ¿Es Pokémon Oscuro (Shadow)?</span>
+                  </label>
+                  <p class="text-[11px] text-slate-400">
+                    +20% Bono de Ataque (x1.20) y -16.7% Defensa en combate.
+                  </p>
+                </div>
+                <input
+                  id="toggle-box-shadow"
+                  type="checkbox"
+                  class="w-5 h-5 accent-purple-500 rounded cursor-pointer"
+                />
+              </div>
+
+              <!-- Configuración Dinamax / Gigamax -->
+              <div class="p-3.5 rounded-xl bg-pink-950/30 border border-pink-500/40 space-y-3">
+                <div class="flex items-center justify-between">
+                  <label for="select-box-max-class" class="text-xs sm:text-sm font-bold text-pink-300">
+                    🌀 Factor Dinamax / Gigamax
+                  </label>
+                  <select
+                    id="select-box-max-class"
+                    class="rounded-lg bg-slate-950 border border-pink-500/50 px-2.5 py-1 text-xs font-bold text-pink-200 focus:outline-none"
+                  >
+                    <option value="none">No es Max (Solo Raids)</option>
+                    <option value="dynamax">Dinamax (D-Max)</option>
+                    <option value="gigantamax">Gigamax (G-Max)</option>
+                    <option value="eternamax">Eternatus (Cañón Dinamax)</option>
+                  </select>
+                </div>
+
+                <!-- Niveles de Movimientos Max (Ataque, Guardia, Espíritu) -->
+                <div id="max-moves-levels-panel" class="hidden grid grid-cols-3 gap-2 pt-2 border-t border-pink-500/20">
+                  <div>
+                    <label for="select-max-atk-lv" class="block text-[10px] font-bold uppercase text-pink-300 mb-1">
+                      ⚔️ Ataque Max
+                    </label>
+                    <select id="select-max-atk-lv" class="w-full rounded-lg bg-slate-950 border border-slate-700 px-2 py-1.5 text-xs text-white">
+                      <option value="1">Nivel 1</option>
+                      <option value="2">Nivel 2</option>
+                      <option value="3" selected>Nivel 3 (Máx)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label for="select-max-guard-lv" class="block text-[10px] font-bold uppercase text-cyan-300 mb-1">
+                      🛡️ Guardia Max
+                    </label>
+                    <select id="select-max-guard-lv" class="w-full rounded-lg bg-slate-950 border border-slate-700 px-2 py-1.5 text-xs text-white">
+                      <option value="0">Bloqueado</option>
+                      <option value="1">Nivel 1</option>
+                      <option value="2">Nivel 2</option>
+                      <option value="3">Nivel 3 (Máx)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label for="select-max-spirit-lv" class="block text-[10px] font-bold uppercase text-emerald-300 mb-1">
+                      ❤️ Espíritu Max
+                    </label>
+                    <select id="select-max-spirit-lv" class="w-full rounded-lg bg-slate-950 border border-slate-700 px-2 py-1.5 text-xs text-white">
+                      <option value="0">Bloqueado</option>
+                      <option value="1">Nivel 1</option>
+                      <option value="2">Nivel 2</option>
+                      <option value="3">Nivel 3 (Máx)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Botón Guardar en Mi Caja -->
+            <button
+              id="btn-save-pokemon"
+              type="submit"
+              class="w-full py-3 px-4 rounded-xl font-display font-bold text-sm uppercase tracking-wider bg-gradient-to-r from-emerald-500 to-cyan-600 hover:from-emerald-400 hover:to-cyan-500 text-white shadow-lg shadow-cyan-500/20 transition"
+            >
+              💾 Guardar en Mi Caja Pokémon
+            </button>
+          </form>
+        </div>
+
+        <!-- COLECCIÓN DE TARJETAS DE MI CAJA POKÉMON (7 cols) -->
+        <div class="lg:col-span-7 space-y-4">
+          <div class="bg-slate-900/95 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 class="font-display text-base sm:text-lg font-extrabold text-white">
+                📦 Mi Colección Personal Guardada
+              </h2>
+              <p class="text-xs text-slate-400">
+                Almacenada automáticamente en tu navegador (<code class="text-cyan-300">localStorage</code>).
+              </p>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <input
+                id="input-filter-box"
+                type="text"
+                placeholder="Filtrar mi caja..."
+                class="rounded-xl bg-slate-950 border border-slate-700 px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+              />
+              <button
+                id="btn-clear-box"
+                type="button"
+                class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 border border-rose-500/40 transition"
+              >
+                Vaciar Caja
+              </button>
+            </div>
+          </div>
+
+          <!-- Grid de Tarjetas de Mi Caja -->
+          <div id="my-box-cards-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <!-- Se renderiza dinámicamente desde localStorage en Fase 2 -->
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ======================================================================
+         VISTA 3: BASE DE DATOS META, ETERNATUS Y GIGAMAX (EXPLORADOR)
+         ====================================================================== -->
+    <section id="tab-pokedex" class="tab-panel hidden space-y-5">
+      <div class="bg-slate-900/95 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+          <div>
+            <h2 class="font-display text-lg font-extrabold text-white">
+              🧬 Base de Datos Meta de Pokémon GO (<code class="text-pink-400">data/pokemon_db.js</code>)
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5">
+              Incluye a Eternatus (Cañón Dinamax), Duraludon Gigamax, Iniciales de Galar/Kanto Gigamax, Fusiones, Primigenios y Megas.
+            </p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span id="db-total-species-badge" class="px-3 py-1 rounded-xl font-mono text-xs font-bold bg-pink-500/20 text-pink-300 border border-pink-500/40">
+              0 Especies Cargadas
+            </span>
+          </div>
+        </div>
+
+        <div id="pokedex-catalog-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <!-- Se renderiza automáticamente con los datos de POKE_DB -->
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ========================================================================
+       FOOTER
+       ======================================================================== -->
+  <footer class="border-t border-slate-800/80 bg-slate-950/90 py-4 mt-10">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+      <span>PokéRaid &amp; Max Optimizer · Fórmulas oficiales de daño PoGO (CPM, STAB 1.2x, Eficacia 1.6x, Shadow 1.2x, Party Power &amp; Max Potency)</span>
+      <span class="font-mono text-emerald-400">v2.5 · Motor Matemático PvE &amp; Combates Max Activo</span>
+    </div>
+  </footer>
+
+  <!-- ========================================================================
+       SCRIPTS DE LA APLICACIÓN (Arquitectura Modular)
+       ======================================================================== -->
+  <script src="data/pokemon_db.js"></script>
+  <script src="js/box.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
