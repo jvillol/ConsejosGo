@@ -1812,8 +1812,76 @@
       });
     });
 
+    let calcFeedbackTimer = null;
     runBtn.addEventListener("click", () => {
-      runOptimizerCalculation();
+      const statusBox = document.getElementById("optimizer-calc-status");
+      const statusText = document.getElementById("optimizer-calc-status-text");
+      const statusTime = document.getElementById("optimizer-calc-status-time");
+      const progressWrap = document.getElementById("optimizer-calc-progress-wrap");
+      const verdictBadge = document.getElementById("verdict-badge");
+      const verdictCard = document.getElementById("verdict-card");
+      const resultsPanel = document.getElementById("optimizer-results-panel");
+
+      if (calcFeedbackTimer) clearTimeout(calcFeedbackTimer);
+
+      runBtn.disabled = true;
+      runBtn.setAttribute("aria-busy", "true");
+      runBtn.innerHTML = `
+        <svg class="animate-spin h-4 w-4 text-white shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+        </svg>
+        <span>Calculando equipo real...</span>
+      `;
+
+      if (statusBox) {
+        statusBox.className =
+          "rounded-xl border border-cyan-500/50 bg-cyan-950/35 px-3.5 py-2.5 text-xs text-cyan-200 transition-all duration-300";
+      }
+      if (statusText) {
+        statusText.textContent = "⏳ Calculando daño real, aguante y jugadores necesarios...";
+      }
+      if (statusTime) statusTime.textContent = "";
+      if (progressWrap) progressWrap.classList.remove("hidden");
+
+      if (verdictBadge) {
+        verdictBadge.textContent = "⏳ Calculando...";
+        verdictBadge.className =
+          "px-3 py-1.5 rounded-xl font-mono text-[11px] sm:text-xs font-bold uppercase tracking-wider bg-cyan-500/20 text-cyan-200 border border-cyan-400/50 animate-pulse";
+      }
+
+      calcFeedbackTimer = setTimeout(() => {
+        const plan = runOptimizerCalculation({ isManualTrigger: true });
+
+        runBtn.disabled = false;
+        runBtn.removeAttribute("aria-busy");
+        runBtn.innerHTML = `<span>⚡ Calcular Equipo Ideal y Jugadores</span>`;
+        if (progressWrap) progressWrap.classList.add("hidden");
+
+        if (plan) {
+          const pct = plan.personalMetrics.combinedGroupPct;
+          const bossName = plan.bossProfile.name;
+          const verdictShort = plan.personalMetrics.canBeatWithFriends
+            ? "¡Victoria alcanzada!"
+            : `+${plan.scenarios.hardcore.count}-${plan.scenarios.standard.count} jugadores`;
+
+          showNotification(
+            `✅ ¡Cálculo listo para ${bossName}! Cobertura: ${pct}% (${verdictShort})`,
+            "info"
+          );
+        }
+
+        if (verdictCard) {
+          verdictCard.classList.add("ring-2", "ring-emerald-400/80");
+          setTimeout(() => {
+            verdictCard.classList.remove("ring-2", "ring-emerald-400/80");
+          }, 1600);
+        }
+
+        if (resultsPanel && window.innerWidth < 1024) {
+          resultsPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 280);
     });
 
     document.addEventListener("click", (e) => {
@@ -1836,7 +1904,7 @@
     selectBossById(state.selectedBossId);
   }
 
-  function runOptimizerCalculation() {
+  function runOptimizerCalculation(options = {}) {
     persistUiState();
     const allBoxList = global.PokeBoxManager.getAll("all");
     const plan = global.PokeOptimizerEngine.calculateBattlePlan(
@@ -1862,6 +1930,33 @@
 
     renderBossSummary(plan.bossProfile, plan.battleMode);
     renderCalculationResults(plan);
+
+    const statusBox = document.getElementById("optimizer-calc-status");
+    const statusText = document.getElementById("optimizer-calc-status-text");
+    const statusTime = document.getElementById("optimizer-calc-status-time");
+    const progressWrap = document.getElementById("optimizer-calc-progress-wrap");
+    if (progressWrap) progressWrap.classList.add("hidden");
+    const timeStr = new Date().toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit"
+    });
+
+    if (statusText && statusBox) {
+      const pct = plan.personalMetrics.combinedGroupPct;
+      if (options.isManualTrigger) {
+        statusBox.className =
+          "rounded-xl border border-emerald-500/60 bg-emerald-950/35 px-3.5 py-2.5 text-xs text-emerald-200 transition-all duration-300 shadow-sm shadow-emerald-500/10";
+        statusText.textContent = `✅ ¡Cálculo listo! Cobertura real del equipo: ${pct}%`;
+      } else {
+        statusBox.className =
+          "rounded-xl border border-slate-800 bg-slate-950/90 px-3.5 py-2.5 text-xs text-slate-300 transition-all duration-300";
+        statusText.textContent = `✅ Cálculo actualizado (${pct}% cobertura)`;
+      }
+    }
+    if (statusTime) statusTime.textContent = timeStr;
+
+    return plan;
   }
 
   function renderBossSummary(bossProfile, battleMode) {
