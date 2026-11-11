@@ -971,12 +971,14 @@
               <div class="relative flex items-center">
                 <input
                   id="input-custom-cp"
-                  type="number"
+                  type="text"
                   inputmode="numeric"
-                  min="10"
-                  max="7000"
-                  placeholder="Introduce los PC (ej: 4150, 3200, 2450...)"
-                  class="w-full min-h-[46px] rounded-xl bg-slate-900 border-2 border-cyan-500/50 pl-3.5 pr-28 py-2 text-sm sm:text-base font-mono font-bold text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 shadow-inner"
+                  pattern="[0-9]*"
+                  enterkeyhint="done"
+                  autocomplete="off"
+                  maxlength="4"
+                  placeholder="Ej: 4150, 3200, 2450..."
+                  class="w-full min-h-[46px] rounded-xl bg-slate-900 border-2 border-cyan-500/50 pl-3.5 pr-40 py-2 text-sm sm:text-base font-mono font-bold text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 shadow-inner"
                 />
                 <div class="absolute right-2 flex items-center gap-1">
                   <button
@@ -994,6 +996,14 @@
                     title="Calcular PC al Nivel 50 (Máx)"
                   >
                     Nv. 50
+                  </button>
+                  <button
+                    type="button"
+                    id="btn-cp-done"
+                    class="px-2 py-1 rounded-md text-[10px] font-extrabold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 active:scale-95 transition"
+                    title="Confirmar PC y cerrar teclado"
+                  >
+                    ✓ Listo
                   </button>
                 </div>
               </div>

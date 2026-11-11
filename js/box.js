@@ -336,9 +336,13 @@
       : realDef;
 
     const fastMoveObj =
-      db.fastMoves[rawEntry.fastMove] || db.fastMoves[species.fastMoves[0]];
+      db.fastMoves[rawEntry.fastMove] ||
+      db.fastMoves[species.fastMoves[0]] ||
+      Object.values(db.fastMoves)[0];
     const chargedMoveObj =
-      db.chargedMoves[rawEntry.chargedMove] || db.chargedMoves[species.chargedMoves[0]];
+      db.chargedMoves[rawEntry.chargedMove] ||
+      db.chargedMoves[species.chargedMoves[0]] ||
+      Object.values(db.chargedMoves)[0];
 
     const maxMoveInfo = resolveMaxMoveInfo(species, rawEntry);
     const ownerId = rawEntry.ownerId || "me";

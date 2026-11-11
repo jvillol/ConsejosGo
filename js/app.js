@@ -528,16 +528,31 @@
       });
     }
 
+    const btnCpDone = document.getElementById("btn-cp-done");
+    if (btnCpDone) {
+      btnCpDone.addEventListener("click", () => {
+        customCpInput.blur();
+      });
+    }
+
     function getFilteredBoxSpecies(filterText = "") {
       const q = normalizeSearchText(filterText);
+      if (!q) return db.pokemon.filter((p) => !p.bossOnly);
+      const tokens = q.split(/\s+/).filter(Boolean);
       return db.pokemon.filter((p) => {
         if (p.bossOnly) return false;
-        if (!q) return true;
         const typeNames = p.types.map((t) => db.typeMeta[t].name).join(" ");
+        const formTags = p.isMega
+          ? "mega"
+          : p.maxCapable
+          ? p.maxForm === "gigantamax"
+            ? "gigamax gmax"
+            : "dinamax dmax"
+          : "";
         const haystack = normalizeSearchText(
-          `${p.name} ${p.dex} #${p.dex} ${typeNames} ${p.roleTag || ""}`
+          `${p.name} ${p.dex} #${p.dex} ${typeNames} ${formTags} ${p.roleTag || ""}`
         );
-        return haystack.includes(q);
+        return tokens.every((tok) => haystack.includes(tok));
       });
     }
 
@@ -686,11 +701,17 @@
         shadowCheckbox.checked = false;
       }
 
-      if (!state.editingUid) {
-        if (species.maxCapable && species.maxForm) {
-          maxClassSelect.value = species.maxForm;
-        } else {
-          maxClassSelect.value = "none";
+      if (species.isMega) {
+        maxClassSelect.value = "none";
+        maxClassSelect.disabled = true;
+      } else {
+        maxClassSelect.disabled = false;
+        if (!state.editingUid) {
+          if (species.maxCapable && species.maxForm) {
+            maxClassSelect.value = species.maxForm;
+          } else {
+            maxClassSelect.value = "none";
+          }
         }
       }
 
@@ -776,7 +797,34 @@
     speciesSelect.addEventListener("change", onSpeciesChange);
     maxClassSelect.addEventListener("change", updateMaxLevelsVisibility);
 
-    [ivAtkInput, ivDefInput, ivStaInput, presetSelect, customCpInput].forEach((el) => {
+    customCpInput.addEventListener("input", () => {
+      const raw = customCpInput.value;
+      const digitsOnly = raw.replace(/\D+/g, "").slice(0, 4);
+      if (raw !== digitsOnly) {
+        customCpInput.value = digitsOnly;
+      }
+      updateFormLivePreview();
+    });
+
+    customCpInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        customCpInput.blur();
+      }
+    });
+
+    customCpInput.addEventListener("blur", () => {
+      const digitsOnly = customCpInput.value.replace(/\D+/g, "");
+      if (!digitsOnly) {
+        customCpInput.value = "";
+      } else {
+        const num = Number(digitsOnly);
+        if (num > 7000) customCpInput.value = "7000";
+      }
+      updateFormLivePreview();
+    });
+
+    [ivAtkInput, ivDefInput, ivStaInput, presetSelect].forEach((el) => {
       el.addEventListener("input", updateFormLivePreview);
       el.addEventListener("change", updateFormLivePreview);
     });
@@ -794,9 +842,12 @@
       const atk = Number(ivAtkInput.value);
       const def = Number(ivDefInput.value);
       const sta = Number(ivStaInput.value);
-      const cpVal = customCpInput.value
-        ? Number(customCpInput.value)
-        : (species ? global.PokeBoxManager.calculateCP(species, atk, def, sta, 40) : 3000);
+      const rawCpDigits = customCpInput.value.replace(/\D+/g, "");
+      const parsedCp = rawCpDigits ? Number(rawCpDigits) : 0;
+      const cpVal =
+        parsedCp >= 10
+          ? Math.min(7000, parsedCp)
+          : (species ? global.PokeBoxManager.calculateCP(species, atk, def, sta, 40) : 3000);
 
       const payload = {
         ownerId,
@@ -1629,34 +1680,6 @@
     });
 
     const partyPowerBadge = document.getElementById("party-power-status-badge");
-    partyToggle.addEventListener("change", () => {
-      state.partyPowerEnabled = partyToggle.checked;
-      if (partyPowerBadge) {
-        partyPowerBadge.textContent = state.partyPowerEnabled ? "x2.0 CARGADOS" : "DESACTIVADO";
-        partyPowerBadge.className = state.partyPowerEnabled
-          ? "px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-pink-500/25 text-pink-300 border border-pink-500/40"
-          : "px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-400 border border-slate-700";
-      }
-      document
-        .getElementById("party-size-selector-wrap")
-        .classList.toggle("opacity-40", !state.partyPowerEnabled);
-      runOptimizerCalculation();
-    });
-
-    partySizeBtns.forEach((btn) => {
-      btn.addEventListener("click", () => {
-        state.partySize = Number(btn.getAttribute("data-party-size"));
-        partySizeBtns.forEach((b) => {
-          const active = Number(b.getAttribute("data-party-size")) === state.partySize;
-          b.className = active
-            ? "party-size-btn min-h-[40px] py-1.5 px-2 rounded-lg text-xs font-bold border border-indigo-500/50 bg-indigo-600/30 text-white"
-            : "party-size-btn min-h-[40px] py-1.5 px-2 rounded-lg text-xs font-semibold border border-slate-700 bg-slate-900 text-slate-300 hover:border-indigo-400";
-        });
-        runOptimizerCalculation();
-      });
-    });
-
-    // Botones visuales de Nivel de Amistad
     const friendshipBtns = document.querySelectorAll(".friendship-btn");
     const friendshipLabel = document.getElementById("friendship-multiplier-label");
     const friendshipDescMap = {
@@ -1666,43 +1689,85 @@
       ultra: "+7% Daño (Ultra Amigo)",
       best: "+10% Daño (Mejor Amigo)"
     };
+    const megaBtns = document.querySelectorAll(".mega-bonus-btn");
 
-    friendshipBtns.forEach((btn) => {
+    function syncModifierControlsUI() {
+      partyToggle.checked = Boolean(state.partyPowerEnabled);
+      if (partyPowerBadge) {
+        partyPowerBadge.textContent = state.partyPowerEnabled ? "x2.0 CARGADOS" : "DESACTIVADO";
+        partyPowerBadge.className = state.partyPowerEnabled
+          ? "px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-pink-500/25 text-pink-300 border border-pink-500/40"
+          : "px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-400 border border-slate-700";
+      }
+      const partyWrap = document.getElementById("party-size-selector-wrap");
+      if (partyWrap) partyWrap.classList.toggle("opacity-40", !state.partyPowerEnabled);
+
+      partySizeBtns.forEach((b) => {
+        const active = Number(b.getAttribute("data-party-size")) === state.partySize;
+        b.className = active
+          ? "party-size-btn min-h-[40px] py-1.5 px-2 rounded-lg text-xs font-bold border border-indigo-500/50 bg-indigo-600/30 text-white"
+          : "party-size-btn min-h-[40px] py-1.5 px-2 rounded-lg text-xs font-semibold border border-slate-700 bg-slate-900 text-slate-300 hover:border-indigo-400";
+      });
+
+      if (friendshipSelect) friendshipSelect.value = state.friendship;
+      if (friendshipLabel) {
+        friendshipLabel.textContent = friendshipDescMap[state.friendship] || "+10% Daño";
+      }
+      friendshipBtns.forEach((b) => {
+        const isAct = b.getAttribute("data-friendship-val") === state.friendship;
+        const isColSpan = b.getAttribute("data-friendship-val") === "best";
+        b.className = isAct
+          ? `friendship-btn p-2 rounded-lg text-xs font-bold border border-cyan-400/80 bg-cyan-500/25 text-cyan-200 shadow-sm${
+              isColSpan ? " col-span-2 sm:col-span-2" : ""
+            }`
+          : `friendship-btn p-2 rounded-lg text-xs font-semibold border border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200${
+              isColSpan ? " col-span-2 sm:col-span-2" : ""
+            }`;
+      });
+
+      if (megaSelect) megaSelect.value = state.megaBonus;
+      megaBtns.forEach((b) => {
+        const isAct = b.getAttribute("data-mega-val") === state.megaBonus;
+        b.className = isAct
+          ? "mega-bonus-btn p-2 rounded-lg text-xs font-bold border border-cyan-400/80 bg-cyan-500/25 text-cyan-200 shadow-sm"
+          : "mega-bonus-btn p-2 rounded-lg text-xs font-semibold border border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200";
+      });
+
+      weatherToggle.checked = Boolean(state.weatherBoost);
+      const boxSortSelectEl = document.getElementById("select-box-sort");
+      if (boxSortSelectEl && state.boxSort) {
+        boxSortSelectEl.value = state.boxSort;
+      }
+    }
+
+    global.syncOptimizerModifierControlsUI = syncModifierControlsUI;
+
+    partyToggle.addEventListener("change", () => {
+      state.partyPowerEnabled = partyToggle.checked;
+      syncModifierControlsUI();
+      runOptimizerCalculation();
+    });
+
+    partySizeBtns.forEach((btn) => {
       btn.addEventListener("click", () => {
-        const val = btn.getAttribute("data-friendship-val");
-        state.friendship = val;
-        if (friendshipSelect) friendshipSelect.value = val;
-        if (friendshipLabel) {
-          friendshipLabel.textContent = friendshipDescMap[val] || "+10% Daño";
-        }
-        friendshipBtns.forEach((b) => {
-          const isAct = b.getAttribute("data-friendship-val") === state.friendship;
-          const isColSpan = b.getAttribute("data-friendship-val") === "best";
-          b.className = isAct
-            ? `friendship-btn p-2 rounded-lg text-xs font-bold border border-cyan-400/80 bg-cyan-500/25 text-cyan-200 shadow-sm${
-                isColSpan ? " col-span-2 sm:col-span-2" : ""
-              }`
-            : `friendship-btn p-2 rounded-lg text-xs font-semibold border border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200${
-                isColSpan ? " col-span-2 sm:col-span-2" : ""
-              }`;
-        });
+        state.partySize = Number(btn.getAttribute("data-party-size"));
+        syncModifierControlsUI();
         runOptimizerCalculation();
       });
     });
 
-    // Botones visuales de Mega Aliada
-    const megaBtns = document.querySelectorAll(".mega-bonus-btn");
+    friendshipBtns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.friendship = btn.getAttribute("data-friendship-val");
+        syncModifierControlsUI();
+        runOptimizerCalculation();
+      });
+    });
+
     megaBtns.forEach((btn) => {
       btn.addEventListener("click", () => {
-        const val = btn.getAttribute("data-mega-val");
-        state.megaBonus = val;
-        if (megaSelect) megaSelect.value = val;
-        megaBtns.forEach((b) => {
-          const isAct = b.getAttribute("data-mega-val") === state.megaBonus;
-          b.className = isAct
-            ? "mega-bonus-btn p-2 rounded-lg text-xs font-bold border border-cyan-400/80 bg-cyan-500/25 text-cyan-200 shadow-sm"
-            : "mega-bonus-btn p-2 rounded-lg text-xs font-semibold border border-slate-800 bg-slate-950 text-slate-400 hover:text-slate-200";
-        });
+        state.megaBonus = btn.getAttribute("data-mega-val");
+        syncModifierControlsUI();
         runOptimizerCalculation();
       });
     });
@@ -1767,6 +1832,7 @@
 
     populateBossSelectOptions(bossCandidates);
     renderBossQuickChips();
+    syncModifierControlsUI();
     selectBossById(state.selectedBossId);
   }
 
@@ -2750,10 +2816,45 @@
     renderMyBoxCards();
     runOptimizerCalculation();
 
+    // Ocultar barra inferior móvil mientras se escribe para evitar solapamientos o pulsaciones accidentales al cerrar teclado
+    const mobileBottomNav = document.getElementById("mobile-bottom-nav");
+    if (mobileBottomNav) {
+      let blurTimer = null;
+      document.addEventListener("focusin", (e) => {
+        const tag = e.target && e.target.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") {
+          const inputType = (e.target.type || "").toLowerCase();
+          if (inputType !== "checkbox" && inputType !== "range" && inputType !== "radio") {
+            if (blurTimer) clearTimeout(blurTimer);
+            mobileBottomNav.classList.add("opacity-0", "pointer-events-none");
+          }
+        }
+      });
+      document.addEventListener("focusout", () => {
+        if (blurTimer) clearTimeout(blurTimer);
+        blurTimer = setTimeout(() => {
+          const active = document.activeElement;
+          const activeTag = active && active.tagName;
+          const activeType = active && active.type ? String(active.type).toLowerCase() : "";
+          const stillTyping =
+            (activeTag === "INPUT" || activeTag === "TEXTAREA" || activeTag === "SELECT") &&
+            activeType !== "checkbox" &&
+            activeType !== "range" &&
+            activeType !== "radio";
+          if (!stillTyping) {
+            mobileBottomNav.classList.remove("opacity-0", "pointer-events-none");
+          }
+        }, 120);
+      });
+    }
+
     if (global.PokeBoxManager && global.PokeBoxManager.syncPersistentCache) {
       global.PokeBoxManager.syncPersistentCache().then((restoredFromIDB) => {
         if (restoredFromIDB) {
           restoreUiStateFromCache();
+          if (typeof global.syncOptimizerModifierControlsUI === "function") {
+            global.syncOptimizerModifierControlsUI();
+          }
           populateOwnerSelectors();
           renderMyBoxCards();
           runOptimizerCalculation();
