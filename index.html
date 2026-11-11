@@ -621,8 +621,18 @@
                 </h2>
               </div>
 
-              <div id="verdict-badge" class="px-3 py-1.5 rounded-xl font-mono text-[11px] sm:text-xs font-bold uppercase tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
-                Analizando...
+              <div class="flex flex-wrap items-center gap-2">
+                <div id="verdict-badge" class="px-3 py-1.5 rounded-xl font-mono text-[11px] sm:text-xs font-bold uppercase tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                  Analizando...
+                </div>
+                <button
+                  id="btn-copy-battle-plan"
+                  type="button"
+                  title="Copiar resumen del plan para WhatsApp/Discord"
+                  class="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 active:scale-95 transition cursor-pointer"
+                >
+                  📋 Copiar
+                </button>
               </div>
             </div>
 

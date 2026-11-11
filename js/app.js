@@ -416,6 +416,9 @@
           const fId = btn.getAttribute("data-delete-friend");
           global.PokeBoxManager.removeFriend(fId);
           state.activeCombatFriendIds = state.activeCombatFriendIds.filter((id) => id !== fId);
+          if (state.boxSelectedOwner === fId) {
+            state.boxSelectedOwner = "me";
+          }
           populateOwnerSelectors();
           renderManageFriendsList();
           renderMyBoxCards();
@@ -1902,6 +1905,37 @@
     renderBossQuickChips();
     syncModifierControlsUI();
     selectBossById(state.selectedBossId);
+
+    const copyPlanBtn = document.getElementById("btn-copy-battle-plan");
+    if (copyPlanBtn) {
+      copyPlanBtn.addEventListener("click", () => {
+        const plan = state.lastBattlePlan;
+        if (!plan) return;
+        const teamLines =
+          plan.team.length > 0
+            ? plan.team
+                .map(
+                  (t, idx) =>
+                    `${idx + 1}. ${t.boxEntry.nickname} (PC ${t.boxEntry.cp} · Nv.${t.boxEntry.level} · ${t.dps}/s)`
+                )
+                .join("\n")
+            : "Sin Pokémon en tu caja personal.";
+        const summary = [
+          `⚔️ ${plan.bossProfile.species.name} (${plan.battleMode.shortName || plan.battleMode.name})`,
+          `📊 Cobertura actual: ${plan.personalMetrics.combinedGroupPct}% (${plan.personalMetrics.teamDPS} DPS propio · TDO ${plan.personalMetrics.teamTDO})`,
+          `🎯 ${plan.directRecommendation}`,
+          `🛡️ Equipo ideal:\n${teamLines}`
+        ].join("\n");
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(summary).then(
+            () => showNotification("📋 Plan de combate copiado al portapapeles.", "info"),
+            () => showNotification("⚠️ No se pudo copiar automáticamente.", "warning")
+          );
+        } else {
+          showNotification("⚠️ Tu navegador no permite copiar al portapapeles aquí.", "warning");
+        }
+      });
+    }
   }
 
   function runOptimizerCalculation(options = {}) {
@@ -1955,6 +1989,7 @@
       }
     }
     if (statusTime) statusTime.textContent = timeStr;
+    state.lastBattlePlan = plan;
 
     return plan;
   }

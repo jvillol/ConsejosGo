@@ -101,7 +101,7 @@
 
     const friendshipMult = friendshipObj.multiplier;
     const megaMult = megaObj.multiplier;
-    const weatherMult = conditions.weatherBoost && isSuperEffective ? db.combatModifiers.weatherBoost : 1.0;
+    const weatherMult = conditions.weatherBoost ? db.combatModifiers.weatherBoost : 1.0;
 
     return {
       friendshipMult,
@@ -541,40 +541,67 @@
 
     if (battleMode.category === "max") {
       const finisher = team[team.length - 1];
-      const avgTankDPS = team.reduce((acc, item) => acc + item.dps, 0) / team.length;
-      weightedDPS = Math.round((finisher.effectiveMaxDPS * 0.65 + avgTankDPS * 0.35) * 10) / 10;
-      totalTeamTDO = singlePassTDO;
-      const rawMaxSurvival = Math.round(singlePassTime * 1.25);
+      const tankSlots = team.length > 1 ? team.slice(0, team.length - 1) : [finisher];
+      const primaryCharger = tankSlots[0] || finisher;
+      const cycleSec = primaryCharger.fullMaxCycleSec || finisher.fullMaxCycleSec || 29;
+
+      // En Combate Max el tanque absorbe golpes durante la fase de carga y el Rematador entra invulnerable en Fase Max
+      const tankTimeFactor = team.length > 1 ? 1.32 : 1.15;
+      const rawMaxSurvival = Math.round(singlePassTime * tankTimeFactor);
       wipeoutAtSec = rawMaxSurvival;
       if (rawMaxSurvival < bossProfile.timeLimitSec) {
         wipeoutBeforeTimer = true;
       }
       totalSurvivalSec = Math.min(bossProfile.timeLimitSec, rawMaxSurvival);
-      const cycleSec = finisher.fullMaxCycleSec || 29;
       maxCyclesCompleted = Math.max(1, Math.floor(totalSurvivalSec / cycleSec));
+
+      const chargeWindowSec = primaryCharger.meterChargePhaseSec || 14;
+      const tankNormalDPS =
+        tankSlots.reduce((acc, item) => acc + (item.fastDmg / Math.max(0.5, item.fastDurationSec || 1)), 0) /
+        tankSlots.length;
+      const maxCycleTotalDmg =
+        maxCyclesCompleted * (finisher.totalMaxBurstDamage + tankNormalDPS * chargeWindowSec * 0.85);
+
+      totalTeamTDO = Math.max(
+        finisher.totalMaxBurstDamage || 0,
+        Math.round(maxCycleTotalDmg * 0.65 + singlePassTDO * 0.35)
+      );
+      weightedDPS = Math.round((totalTeamTDO / Math.max(1, totalSurvivalSec)) * 10) / 10;
     } else {
       weightedDPS =
         Math.round((team.reduce((acc, item) => acc + item.dps, 0) / team.length) * 10) / 10;
 
-      if (singlePassTime < bossProfile.timeLimitSec - 12) {
-        relobbiesNeeded = Math.max(
-          1,
-          Math.min(3, Math.floor(bossProfile.timeLimitSec / Math.max(25, singlePassTime)))
-        );
-        relobbyTimeLostSec = relobbiesNeeded * 12;
-        const effectiveActiveTime = Math.max(0, bossProfile.timeLimitSec - relobbyTimeLostSec);
-        totalSurvivalSec = effectiveActiveTime;
-        totalTeamTDO = Math.round(weightedDPS * effectiveActiveTime);
-      } else {
-        totalSurvivalSec = bossProfile.timeLimitSec;
-        totalTeamTDO = singlePassTDO;
+      // Simulación oleada a oleada real (incluye re-entradas de ~12s con Máx. Revivir)
+      const passDuration = Math.max(8, singlePassTime);
+      let remainingTime = bossProfile.timeLimitSec;
+      let activeCombatSec = 0;
+      let waveCount = 0;
+
+      while (remainingTime > 0 && waveCount < 25) {
+        waveCount++;
+        const fightThisWave = Math.min(remainingTime, passDuration);
+        activeCombatSec += fightThisWave;
+        remainingTime -= fightThisWave;
+        if (remainingTime > 12) {
+          relobbiesNeeded++;
+          remainingTime -= 12;
+        } else {
+          break;
+        }
       }
+
+      relobbyTimeLostSec = relobbiesNeeded * 12;
+      totalSurvivalSec = Math.max(1, Math.round(activeCombatSec));
+      totalTeamTDO = Math.round(weightedDPS * totalSurvivalSec);
     }
 
-    const rawDamage = Math.min(
-      totalTeamTDO,
-      Math.round(weightedDPS * Math.min(bossProfile.timeLimitSec, totalSurvivalSec))
-    );
+    const rawDamage =
+      battleMode.category === "max"
+        ? totalTeamTDO
+        : Math.min(
+            totalTeamTDO,
+            Math.round(weightedDPS * Math.min(bossProfile.timeLimitSec, totalSurvivalSec))
+          );
     const pct = Math.round((rawDamage / bossProfile.hp) * 1000) / 10;
 
     const avgTimePerPoke = Math.max(8, singlePassTime / team.length);
