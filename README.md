@@ -8,13 +8,20 @@ Aplicación web interactiva para **Pokémon GO** que gestiona tu **Caja de Poké
   - Incluye a **Eternatus** (*Cañón Dinamax* y *Rayo Infinito*, más su forma jefe *Eternamax*), **Duraludon Gigamax** (*Gigaesquirla*), iniciales de Galar Gigamax (**Rillaboom**, **Cinderace**, **Inteleon**), iniciales de Kanto Gigamax (**Charizard**, **Blastoise**, **Venusaur**), **Gengar**, **Toxtricity**, **Machamp**, **Lapras**, **Kingler**, **Corviknight** y **Urshifu (Brusco/Fluido) Gigamax**.
   - Incluye a **Zacian (Espada Suprema)**, **Zamazenta (Escudo Supremo)**, **Mega Rayquaza**, **Groudon y Kyogre Primigenios**, **Necrozma Melena Crepuscular / Alas del Alba**, **Kyurem Negro / Blanco**, **Mewtwo Oscuro**, **Excadrill Dinamax**, **Blissey Dinamax** y los principales counters del meta.
 
-- **Módulo 1: Mi Caja y Amigos Fijos (`js/box.js`):**
-  - **Cálculo Automático de Nivel por PC**: Introduce directamente los **Puntos de Combate (PC)** y los IVs de tu Pokémon; la web calcula su nivel exacto (de 1.0 a 51.0 en pasos de 0.5) y estadísticas reales.
+- **Módulo 1: Mi Caja y Amigos Fijos con Caché Permanente (`js/box.js`):**
+  - **Caché Permanente Doble (`localStorage` + `IndexedDB` + `navigator.storage.persist()`)**: Tus Pokémon, los equipos de tus amigos y tu configuración se guardan automáticamente y se sincronizan en segundo plano para que sigan ahí aunque cierres o vuelvas a abrir la web días después.
+  - **Cálculo Automático de Nivel por PC**: Introduce directamente los **Puntos de Combate (PC)** y los IVs de tu Pokémon; la web calcula su nivel exacto (de 1.0 a 51.0 en pasos de 0.5) y estadísticas reales (`ATQ`, `DEF`, `PS`).
   - **Plantillas Rápidas 1-Tap**: Botones instantáneos para configurar en 1 toque (`⭐ 100% Nv. 50`, `⚔️ Raid Nv. 40`, `🌱 Atrapado Nv. 20`).
   - **Equipos de Amigos Fijos**: Registra a tus amigos habituales y guarda sus Pokémon reales para simular incursiones juntos.
   - **Backup JSON y Ordenación**: Ordena por PC, IV%, Nivel o Pokédex, y exporta/importa copias de seguridad en `.json`.
 
-- **Módulo 2 y 3: Motor Matemático PvE y Simulación Co-op (`js/engine.js` & `js/app.js`):**
+- **Módulo 2 y 3: Motor Matemático PvE, Diagnóstico de Daño/Aguante y Asesor de Caja (`js/engine.js` & `js/app.js`):**
+  - **Explicación Matemática del Resultado (¿Por qué Ganas o Pierdes?)**:
+    - **Por qué en Daño y Reloj**: Compara el **DPS Mínimo Exigido** por el jefe (`HP / Tiempo`) frente al **DPS Real de tu Grupo**, calcula el segundo exacto en que cae el jefe (o cuántos PS le quedan al agotarse el reloj) y desglosa qué porcentaje de tu daño proviene de Ataques Rápidos vs Cargados / Fases Max.
+    - **Por qué en Aguante y Supervivencia**: Calcula cuántos PS quita el jefe por cada Ataque Rápido y Cargado a tu equipo, cuántos ataques cargados soporta cada Pokémon antes de debilitarse, cuántos segundos totales aguanta tu alineación en pie y cuántas bajas/re-entradas al lobby sufrirás (o si pierdes por caída de tus 3 Pokémon en Dinamax/Gigamax donde no hay re-lobby).
+  - **Asesor Inteligente de Mejora de tu Caja**:
+    - Recomienda **qué Pokémon de tu caja subir de nivel** (a Nv. 40 sin XL o Nv. 50) mostrando cuántos PC, `+DPS/s`, `+TDO` y `+% de vida del jefe` ganarás (detectando también joyas ocultas a nivel bajo en tu caja), con botón de 1 clic para actualizarlos.
+    - Recomienda **cambios de Ataque Rápido o Cargado con MT** y **mejoras de Nivel de Ataque Max (Nv. 1/2 ➔ Nv. 3)** cuantificando la ganancia exacta de daño.
   - **4 Modalidades PvE con Reglas y Capacidades Oficiales**:
     - **⚔️ Raids (Nv. 1, 3, 5, Oscuras, Élite)**: **6 Pokémon/jugador** (máx. 1 Mega/Primigenio por equipo, permite re-lobby) · **Sala máx. 20 jugadores**.
     - **🧬 Mega Raids (Mega y Mega Legendaria / Primigenia)**: **6 Pokémon/jugador** (máx. 1 Mega/Primigenio por equipo, permite re-lobby) · **Sala máx. 20 jugadores**.

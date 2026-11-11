@@ -75,10 +75,15 @@
 
       <!-- Indicadores Rápidos, Botón Amigos y Cargar Demo -->
       <div class="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-        <!-- Indicador de Mi Caja -->
-        <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/80 text-xs">
+        <!-- Indicador de Mi Caja y Caché Permanente -->
+        <div
+          id="cache-status-pill"
+          class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/90 border border-emerald-500/40 text-xs"
+          title="Tus Pokémon y los de tus amigos se guardan automáticamente en caché permanente del navegador (localStorage + IndexedDB)"
+        >
           <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span class="text-slate-400 hidden xs:inline sm:inline">Míos:</span>
+          <span class="text-slate-300 hidden md:inline">💾 En Caché:</span>
+          <span class="text-slate-400 md:hidden">Míos:</span>
           <strong id="header-box-count" class="font-mono text-cyan-300 text-xs sm:text-sm">0</strong>
         </div>
 
@@ -649,6 +654,11 @@
               </p>
             </div>
 
+            <!-- NUEVO: ¿POR QUÉ GANAS O PIERDES? DESGLOSE EXACTO DE DAÑO Y AGUANTE -->
+            <div id="combat-diagnostics-panel" class="mt-4 p-4 rounded-xl bg-slate-950/90 border border-slate-800 space-y-3.5">
+              <!-- Se rellena dinámicamente con las estadísticas exactas de Daño/Reloj vs Aguante/Bajas -->
+            </div>
+
             <!-- Desglose de aporte de Amigos Fijos Seleccionados -->
             <div id="friends-contribution-summary" class="mt-4 hidden"></div>
 
@@ -751,6 +761,11 @@
 
             <!-- Grid de Tarjetas del Equipo Recomendado -->
             <div id="recommended-team-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3.5"></div>
+          </div>
+
+          <!-- NUEVO: ASESOR DE MEJORA DE TU CAJA (QUÉ LLEVAR, QUÉ SUBIR DE NIVEL O CAMBIAR ATAQUES) -->
+          <div id="box-upgrade-advisor-panel" class="bg-slate-900/95 border border-cyan-500/30 rounded-2xl p-4 sm:p-6 shadow-2xl space-y-4">
+            <!-- Se rellena dinámicamente con recomendaciones de Power-Up, MT y Nivel Max -->
           </div>
 
         </div>

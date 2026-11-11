@@ -207,6 +207,20 @@
 
     const raidScore = Math.pow(dps, 1.35) * Math.pow(tdo, 0.28);
 
+    const fastDmgInCycle = fastHitsInCycle * fastDmg;
+    const fastSharePct = Math.round((fastDmgInCycle / Math.max(1, cycleDamage)) * 100);
+    const chargedSharePct = Math.max(0, 100 - fastSharePct);
+    const chargedCastsPerLife = Math.max(
+      0,
+      Math.round((timeToFaintSec / Math.max(1, cycleTimeSec)) * 10) / 10
+    );
+    const chargedHitsSurvived = Math.max(
+      0,
+      Math.floor(Math.max(0, boxEntry.stats.hp - bossFastDmg * 2) / Math.max(1, bossChargedDmg))
+    );
+    const isOneShotRisk = bossChargedDmg >= boxEntry.stats.hp * 0.92;
+    const soloBossPct = Math.round((tdo / Math.max(1, bossProfile.hp)) * 1000) / 10;
+
     return {
       boxEntry,
       modeCategory: "raid",
@@ -215,10 +229,23 @@
       timeToFaintSec: Math.round(timeToFaintSec * 10) / 10,
       fastDmg,
       chargedDmg: chargedDmgEffective,
+      chargedDmgNormal,
       fastTypeEff,
       chargedTypeEff,
       bestTypeEff: Math.max(fastTypeEff, chargedTypeEff),
       partyChargedMultiplier: Math.round(partyChargedMultiplier * 100) / 100,
+      bossFastDmg,
+      bossChargedDmg,
+      bossFastEff,
+      bossChargedEff,
+      bossIncomingDPS: Math.round(bossIncomingDPS * 10) / 10,
+      chargedHitsSurvived,
+      isOneShotRisk,
+      fastSharePct,
+      chargedSharePct,
+      chargedCastsPerLife,
+      cycleTimeSec: Math.round(cycleTimeSec * 10) / 10,
+      soloBossPct,
       bossResistanceMult: Math.round(((bossFastEff + bossChargedEff) / 2) * 100) / 100,
       score: raidScore,
       roleLabel: "Atacante DPS Incursión",
@@ -296,21 +323,31 @@
     const maxPhaseDurationSec = 15;
     const fullMaxCycleSec = meterChargePhaseSec + maxPhaseDurationSec;
 
-    const cycleDamageWithMax =
-      baseRaidEval.dps * meterChargePhaseSec + totalMaxBurstDamage;
+    const normalPhaseDamage = baseRaidEval.dps * meterChargePhaseSec;
+    const cycleDamageWithMax = normalPhaseDamage + totalMaxBurstDamage;
     const effectiveMaxDPS = isMaxEligible
       ? Math.round((cycleDamageWithMax / fullMaxCycleSec) * 10) / 10
       : baseRaidEval.dps;
 
-    const effectiveMaxTDO = isMaxEligible
-      ? Math.round(
-          effectiveMaxDPS *
-            Math.min(
-              bossProfile.timeLimitSec,
-              baseRaidEval.timeToFaintSec * (1 + spiritHealFraction + guardShieldHP / Math.max(100, boxEntry.stats.hp))
-            )
+    const effectiveSurvivalSec = isMaxEligible
+      ? Math.min(
+          bossProfile.timeLimitSec,
+          Math.round(
+            baseRaidEval.timeToFaintSec *
+              (1 + spiritHealFraction + guardShieldHP / Math.max(100, boxEntry.stats.hp)) *
+              10
+          ) / 10
         )
+      : baseRaidEval.timeToFaintSec;
+
+    const effectiveMaxTDO = isMaxEligible
+      ? Math.round(effectiveMaxDPS * effectiveSurvivalSec)
       : baseRaidEval.tdo;
+
+    const maxPhaseSharePct = isMaxEligible
+      ? Math.round((totalMaxBurstDamage / Math.max(1, cycleDamageWithMax)) * 100)
+      : 0;
+    const soloBossPct = Math.round((effectiveMaxTDO / Math.max(1, bossProfile.hp)) * 1000) / 10;
 
     return {
       ...baseRaidEval,
@@ -323,8 +360,15 @@
       totalMaxBurstDamage,
       effectiveMaxDPS,
       effectiveMaxTDO,
+      timeToFaintSec: effectiveSurvivalSec,
       dps: effectiveMaxDPS,
       tdo: effectiveMaxTDO,
+      guardShieldHP: Math.round(guardShieldHP),
+      spiritHealHP: Math.round(boxEntry.stats.hp * spiritHealFraction),
+      meterChargePhaseSec,
+      fullMaxCycleSec,
+      maxPhaseSharePct,
+      soloBossPct,
       tankScore: Math.round(tankScore),
       maxAttackerScore: Math.round(maxAttackerScore),
       fastDurationSec,
@@ -460,32 +504,65 @@
   }
 
   /**
-   * Calcula el rendimiento neto de un equipo (DPS promedio, TDO y Daño aportado)
+   * Calcula el rendimiento neto de un equipo (DPS promedio, TDO, Daño aportado y estadísticas de aguante/supervivencia)
    */
   function computeTeamDamage(team, battleMode, bossProfile) {
-    if (!team || team.length === 0) return { dps: 0, tdo: 0, damage: 0, pct: 0 };
+    if (!team || team.length === 0) {
+      return {
+        dps: 0,
+        tdo: 0,
+        damage: 0,
+        pct: 0,
+        singlePassSurvivalSec: 0,
+        singlePassTDO: 0,
+        estimatedFaints: 0,
+        relobbiesNeeded: 0,
+        relobbyTimeLostSec: 0,
+        avgFastSharePct: 0,
+        avgChargedSharePct: 0,
+        avgBossChargedDmg: 0,
+        avgBossFastDmg: 0,
+        maxCyclesCompleted: 0,
+        wipeoutBeforeTimer: false,
+        wipeoutAtSec: 0
+      };
+    }
 
     let weightedDPS = 0;
     let totalTeamTDO = 0;
     let totalSurvivalSec = 0;
+    const singlePassTime = Math.round(team.reduce((acc, item) => acc + item.timeToFaintSec, 0));
+    const singlePassTDO = Math.round(team.reduce((acc, item) => acc + item.tdo, 0));
+    let relobbiesNeeded = 0;
+    let relobbyTimeLostSec = 0;
+    let maxCyclesCompleted = 0;
+    let wipeoutBeforeTimer = false;
+    let wipeoutAtSec = singlePassTime;
 
     if (battleMode.category === "max") {
       const finisher = team[team.length - 1];
       const avgTankDPS = team.reduce((acc, item) => acc + item.dps, 0) / team.length;
       weightedDPS = Math.round((finisher.effectiveMaxDPS * 0.65 + avgTankDPS * 0.35) * 10) / 10;
-      totalTeamTDO = team.reduce((acc, item) => acc + item.tdo, 0);
-      totalSurvivalSec = Math.min(
-        bossProfile.timeLimitSec,
-        team.reduce((acc, item) => acc + item.timeToFaintSec, 0) * 1.25
-      );
+      totalTeamTDO = singlePassTDO;
+      const rawMaxSurvival = Math.round(singlePassTime * 1.25);
+      wipeoutAtSec = rawMaxSurvival;
+      if (rawMaxSurvival < bossProfile.timeLimitSec) {
+        wipeoutBeforeTimer = true;
+      }
+      totalSurvivalSec = Math.min(bossProfile.timeLimitSec, rawMaxSurvival);
+      const cycleSec = finisher.fullMaxCycleSec || 29;
+      maxCyclesCompleted = Math.max(1, Math.floor(totalSurvivalSec / cycleSec));
     } else {
       weightedDPS =
         Math.round((team.reduce((acc, item) => acc + item.dps, 0) / team.length) * 10) / 10;
-      const singlePassTDO = team.reduce((acc, item) => acc + item.tdo, 0);
-      const singlePassTime = team.reduce((acc, item) => acc + item.timeToFaintSec, 0);
 
-      if (singlePassTime < bossProfile.timeLimitSec - 15) {
-        const effectiveActiveTime = Math.max(0, bossProfile.timeLimitSec - 14);
+      if (singlePassTime < bossProfile.timeLimitSec - 12) {
+        relobbiesNeeded = Math.max(
+          1,
+          Math.min(3, Math.floor(bossProfile.timeLimitSec / Math.max(25, singlePassTime)))
+        );
+        relobbyTimeLostSec = relobbiesNeeded * 12;
+        const effectiveActiveTime = Math.max(0, bossProfile.timeLimitSec - relobbyTimeLostSec);
         totalSurvivalSec = effectiveActiveTime;
         totalTeamTDO = Math.round(weightedDPS * effectiveActiveTime);
       } else {
@@ -500,11 +577,264 @@
     );
     const pct = Math.round((rawDamage / bossProfile.hp) * 1000) / 10;
 
+    const avgTimePerPoke = Math.max(8, singlePassTime / team.length);
+    const maxFaintsAllowed = battleMode.allowRelobby ? team.length * (relobbiesNeeded + 1) : team.length;
+    const estimatedFaints = Math.min(
+      maxFaintsAllowed,
+      Math.floor(Math.min(bossProfile.timeLimitSec, totalSurvivalSec) / avgTimePerPoke)
+    );
+
+    const avgFastSharePct = Math.round(
+      team.reduce((acc, item) => acc + (item.fastSharePct || 30), 0) / team.length
+    );
+    const avgChargedSharePct = Math.max(0, 100 - avgFastSharePct);
+    const avgBossChargedDmg = Math.round(
+      team.reduce((acc, item) => acc + (item.bossChargedDmg || 0), 0) / team.length
+    );
+    const avgBossFastDmg = Math.round(
+      team.reduce((acc, item) => acc + (item.bossFastDmg || 0), 0) / team.length
+    );
+
     return {
       dps: weightedDPS,
       tdo: totalTeamTDO,
       damage: rawDamage,
-      pct
+      pct,
+      singlePassSurvivalSec: singlePassTime,
+      singlePassTDO,
+      estimatedFaints,
+      relobbiesNeeded,
+      relobbyTimeLostSec,
+      avgFastSharePct,
+      avgChargedSharePct,
+      avgBossChargedDmg,
+      avgBossFastDmg,
+      maxCyclesCompleted,
+      wipeoutBeforeTimer,
+      wipeoutAtSec
+    };
+  }
+
+  /**
+   * Analiza toda la caja personal del usuario para recomendar:
+   *  1) Qué Pokémon subir de nivel (a Nv. 40 sin XL o Nv. 50) y cuánto daño/aguante extra ganan.
+   *  2) Qué Pokémon tienen ataques subóptimos y qué ataque ponerles con MT para ganar más DPS/carga Max.
+   *  3) Qué movimientos Max subir de nivel en combates Dinamax/Gigamax.
+   */
+  function analyzeBoxRecommendations(myBox, myTeam, evaluatedMyList, bossProfile, battleMode, conditions) {
+    const db = getDB();
+    if (!myBox || myBox.length === 0) {
+      return {
+        powerUpAdvices: [],
+        moveChangeAdvices: [],
+        maxUpgradeAdvices: [],
+        benchGems: []
+      };
+    }
+
+    const evalFn = battleMode.category === "max" ? evaluateMaxPokemon : evaluateRaidPokemon;
+    const teamUids = new Set(myTeam.map((t) => t.boxEntry.uid));
+    const lowestTeamStarterScore =
+      myTeam.length > 0 ? myTeam[myTeam.length - 1].score : 0;
+
+    const powerUpAdvices = [];
+    const moveChangeAdvices = [];
+    const maxUpgradeAdvices = [];
+    const benchGems = [];
+
+    for (const currentEval of evaluatedMyList) {
+      const entry = currentEval.boxEntry;
+      const species = entry.species;
+      if (!species) continue;
+
+      if (battleMode.category === "max" && isMegaOrPrimalSpecies(species)) {
+        continue;
+      }
+
+      const isStarter = teamUids.has(entry.uid);
+
+      // ----------------------------------------------------------------------
+      // 1. Evaluar si hay mejor combinación de Ataque Rápido + Ataque Cargado en su pool
+      // ----------------------------------------------------------------------
+      let bestMovesetEval = currentEval;
+      let bestFastId = entry.fastMoveObj.id;
+      let bestChargedId = entry.chargedMoveObj.id;
+
+      for (const fId of species.fastMoves || []) {
+        for (const cId of species.chargedMoves || []) {
+          if (fId === entry.fastMoveObj.id && cId === entry.chargedMoveObj.id) continue;
+          const candidateEnriched = global.PokeBoxManager.enrichBoxPokemon({
+            ...entry,
+            fastMove: fId,
+            chargedMove: cId
+          });
+          if (!candidateEnriched) continue;
+          const candEval = evalFn(candidateEnriched, bossProfile, conditions);
+          if (candEval.dps > bestMovesetEval.dps + 0.6 || candEval.score > bestMovesetEval.score * 1.06) {
+            bestMovesetEval = candEval;
+            bestFastId = fId;
+            bestChargedId = cId;
+          }
+        }
+      }
+
+      if (bestFastId !== entry.fastMoveObj.id || bestChargedId !== entry.chargedMoveObj.id) {
+        const dpsGain = Math.round((bestMovesetEval.dps - currentEval.dps) * 10) / 10;
+        const pctGain =
+          currentEval.dps > 0
+            ? Math.round(((bestMovesetEval.dps - currentEval.dps) / currentEval.dps) * 100)
+            : 15;
+        if (dpsGain >= 0.5 || pctGain >= 4) {
+          const newFastObj = db.fastMoves[bestFastId];
+          const newChargedObj = db.chargedMoves[bestChargedId];
+          moveChangeAdvices.push({
+            uid: entry.uid,
+            nickname: entry.nickname,
+            dex: species.dex,
+            isStarter,
+            currentFastName: entry.fastMoveObj.name,
+            currentChargedName: entry.chargedMoveObj.name,
+            recommendedFastId: bestFastId,
+            recommendedFastName: newFastObj ? newFastObj.name : bestFastId,
+            recommendedChargedId: bestChargedId,
+            recommendedChargedName: newChargedObj ? newChargedObj.name : bestChargedId,
+            oldDPS: currentEval.dps,
+            newDPS: bestMovesetEval.dps,
+            dpsGain,
+            pctGain,
+            newBestEff: bestMovesetEval.bestTypeEff,
+            reason:
+              battleMode.category === "max" &&
+              newFastObj &&
+              newFastObj.durationMs <= 500 &&
+              entry.fastMoveObj.durationMs > 500
+                ? `Carga el medidor Max mucho más rápido (${newFastObj.durationMs / 1000}s vs ${entry.fastMoveObj.durationMs / 1000}s) y mejora su daño.`
+                : `Mayor eficacia elemental (x${bestMovesetEval.bestTypeEff}) y ciclo de daño superior contra ${bossProfile.species.name}.`
+          });
+        }
+      }
+
+      // ----------------------------------------------------------------------
+      // 2. Evaluar subida de Nivel (a Nv. 40 si está < 39.5, o a Nv. 50 si está < 49.5)
+      // ----------------------------------------------------------------------
+      const targetLevel = entry.level < 39.5 ? 40 : entry.level < 49.5 ? 50 : null;
+      if (targetLevel) {
+        const targetCP = global.PokeBoxManager.calculateCP(
+          species,
+          entry.ivAtk,
+          entry.ivDef,
+          entry.ivSta,
+          targetLevel
+        );
+        const leveledEnriched = global.PokeBoxManager.enrichBoxPokemon({
+          ...entry,
+          level: targetLevel,
+          levelPreset: targetLevel === 50 ? "maxed" : "no_xl",
+          cp: targetCP,
+          customCP: targetCP,
+          fastMove: bestFastId,
+          chargedMove: bestChargedId
+        });
+
+        if (leveledEnriched) {
+          const leveledEval = evalFn(leveledEnriched, bossProfile, conditions);
+          const dpsGain = Math.round((leveledEval.dps - currentEval.dps) * 10) / 10;
+          const tdoGain = Math.round(leveledEval.tdo - currentEval.tdo);
+          const survivalGainSec =
+            Math.round((leveledEval.timeToFaintSec - currentEval.timeToFaintSec) * 10) / 10;
+          const extraBossPct =
+            Math.round(((leveledEval.tdo - currentEval.tdo) / Math.max(1, bossProfile.hp)) * 1000) /
+            10;
+          const dpsPctGain =
+            currentEval.dps > 0
+              ? Math.round(((leveledEval.dps - currentEval.dps) / currentEval.dps) * 100)
+              : 0;
+
+          const qualifiesAsStarterOrGem =
+            isStarter || leveledEval.score >= lowestTeamStarterScore * 0.92;
+
+          if (qualifiesAsStarterOrGem && (dpsGain >= 0.8 || tdoGain >= 60)) {
+            const adviceItem = {
+              uid: entry.uid,
+              nickname: entry.nickname,
+              dex: species.dex,
+              isStarter,
+              isBenchGem: !isStarter && leveledEval.score >= lowestTeamStarterScore,
+              currentLevel: entry.level,
+              currentCP: entry.cp,
+              targetLevel,
+              targetCP,
+              oldDPS: currentEval.dps,
+              newDPS: leveledEval.dps,
+              dpsGain,
+              dpsPctGain,
+              oldTDO: currentEval.tdo,
+              newTDO: leveledEval.tdo,
+              tdoGain,
+              survivalGainSec,
+              extraBossPct: Math.max(0.2, extraBossPct),
+              bestTypeEff: leveledEval.bestTypeEff,
+              includesMoveFix:
+                bestFastId !== entry.fastMoveObj.id || bestChargedId !== entry.chargedMoveObj.id,
+              recommendedFastId: bestFastId,
+              recommendedChargedId: bestChargedId
+            };
+            powerUpAdvices.push(adviceItem);
+            if (adviceItem.isBenchGem) {
+              benchGems.push(adviceItem);
+            }
+          }
+        }
+      }
+
+      // ----------------------------------------------------------------------
+      // 3. Evaluar mejora de Movimiento Max en Dinamax / Gigamax
+      // ----------------------------------------------------------------------
+      if (
+        battleMode.category === "max" &&
+        currentEval.isMaxEligible &&
+        entry.maxMoveInfo &&
+        entry.maxMoveInfo.atkLevel < 3
+      ) {
+        const maxLv3Enriched = global.PokeBoxManager.enrichBoxPokemon({
+          ...entry,
+          maxAttackLevel: 3
+        });
+        if (maxLv3Enriched) {
+          const maxLv3Eval = evaluateMaxPokemon(maxLv3Enriched, bossProfile, conditions);
+          const burstGain = maxLv3Eval.totalMaxBurstDamage - currentEval.totalMaxBurstDamage;
+          const dpsGain = Math.round((maxLv3Eval.dps - currentEval.dps) * 10) / 10;
+          if (burstGain > 0) {
+            maxUpgradeAdvices.push({
+              uid: entry.uid,
+              nickname: entry.nickname,
+              dex: species.dex,
+              isStarter,
+              moveName: entry.maxMoveInfo.moveName,
+              currentAtkLevel: entry.maxMoveInfo.atkLevel,
+              targetAtkLevel: 3,
+              oldBurst: currentEval.totalMaxBurstDamage,
+              newBurst: maxLv3Eval.totalMaxBurstDamage,
+              burstGain,
+              dpsGain
+            });
+          }
+        }
+      }
+    }
+
+    powerUpAdvices.sort((a, b) => {
+      if (a.isStarter !== b.isStarter) return a.isStarter ? -1 : 1;
+      return b.dpsGain * 10 + b.tdoGain * 0.05 - (a.dpsGain * 10 + a.tdoGain * 0.05);
+    });
+    moveChangeAdvices.sort((a, b) => b.dpsGain - a.dpsGain);
+    maxUpgradeAdvices.sort((a, b) => b.burstGain - a.burstGain);
+
+    return {
+      powerUpAdvices: powerUpAdvices.slice(0, 6),
+      moveChangeAdvices: moveChangeAdvices.slice(0, 5),
+      maxUpgradeAdvices: maxUpgradeAdvices.slice(0, 4),
+      benchGems: benchGems.slice(0, 3)
     };
   }
 
@@ -662,6 +992,103 @@
     const activeMultiplier =
       Math.round(ext.combinedExternal * samplePartyMult * 100) / 100;
 
+    // 4. Diagnóstico exacto de Daño vs Aguante (Por qué ganas o por qué pierdes)
+    const requiredGroupDPS =
+      Math.round((bossProfile.hp / Math.max(1, bossProfile.timeLimitSec)) * 10) / 10;
+    const friendsTotalDPS = Math.round(
+      friendsBreakdown.reduce((acc, f) => acc + (f.performance.dps || 0), 0) * 10
+    ) / 10;
+    const randomsTotalDPS =
+      Math.round((totalRandomDamage / Math.max(1, bossProfile.timeLimitSec)) * 10) / 10;
+    const actualGroupDPS =
+      Math.round((myPerformance.dps + friendsTotalDPS + randomsTotalDPS) * 10) / 10;
+    const dpsDelta = Math.round((actualGroupDPS - requiredGroupDPS) * 10) / 10;
+
+    const estimatedTimeToKillSec =
+      actualGroupDPS > 0
+        ? Math.ceil(bossProfile.hp / actualGroupDPS)
+        : 999;
+    const timeSpareSec = Math.max(0, bossProfile.timeLimitSec - estimatedTimeToKillSec);
+    const extraSecondsNeeded = Math.max(0, estimatedTimeToKillSec - bossProfile.timeLimitSec);
+
+    // Determinar cuello de botella principal (Daño/Reloj vs Aguante/Supervivencia)
+    let primaryBottleneck = "none";
+    let bottleneckTitle = "✅ Equilibrio Óptimo de Daño y Aguante";
+    let bottleneckExplanation = "";
+
+    if (myTeam.length === 0) {
+      primaryBottleneck = "empty_box";
+      bottleneckTitle = "📦 Caja Personal Vacía";
+      bottleneckExplanation =
+        "Añade tus Pokémon con sus PC e IVs para calcular tiempos de muerte, daño por ciclo y resistencias frente al jefe.";
+    } else if (canBeatWithFriends) {
+      if (battleMode.category === "max" && myPerformance.wipeoutBeforeTimer && myPerformance.wipeoutAtSec < estimatedTimeToKillSec) {
+        primaryBottleneck = "endurance_risk";
+        bottleneckTitle = "⚠️ Daño Suficiente pero Riesgo de Caída (Wipeout Max)";
+        bottleneckExplanation = `Tenéis DPS para bajar a ${bossSpecies.name} en ~${estimatedTimeToKillSec}s, pero tu patrulla de 3 Pokémon sufre mucho daño de ${bossProfile.chargedMove.name} (${myPerformance.avgBossChargedDmg} dmg/cargado) y podría caer a los ~${myPerformance.wipeoutAtSec}s (en Combates Max NO hay re-lobby). Usa Guardia/Espíritu Max o sube de nivel tus tanques.`;
+      } else {
+        bottleneckTitle = `🏆 Victoria en ~${Math.min(bossProfile.timeLimitSec, estimatedTimeToKillSec)}s (Sobran ${timeSpareSec}s en el reloj)`;
+        bottleneckExplanation = `El jefe exige ${requiredGroupDPS} DPS para caer antes de ${bossProfile.timeLimitSec}s y vuestro grupo alcanza ${actualGroupDPS} DPS (+${Math.max(0, dpsDelta)} DPS de margen). Tu equipo aguanta ${myPerformance.singlePassSurvivalSec}s por pase${
+          battleMode.allowRelobby
+            ? ` (${myPerformance.relobbiesNeeded} re-lobbies estimados, ~${myPerformance.estimatedFaints} bajas).`
+            : ` sin caer debilitado (${myPerformance.maxCyclesCompleted} fases Max completadas).`
+        }`;
+      }
+    } else {
+      if (battleMode.category === "max" && myPerformance.wipeoutBeforeTimer) {
+        primaryBottleneck = "max_wipeout_and_dps";
+        bottleneckTitle = `❌ Derrota por Falta de Aguante (Caen tus 3 Pokémon a los ~${myPerformance.wipeoutAtSec}s) y Falta de DPS`;
+        bottleneckExplanation = `En Dinamax/Gigamax solo llevas 3 Pokémon y NO puedes re-entrar al lobby. El ataque cargado del jefe (${bossProfile.chargedMove.name}) golpea con ~${myPerformance.avgBossChargedDmg} PS por impacto y debilita a tus 3 Pokémon a los ${myPerformance.wipeoutAtSec}s (antes de agotar los ${bossProfile.timeLimitSec}s), dejando a ${bossSpecies.name} con ${remainingBossHP.toLocaleString()} PS restantes (${100 - combinedGroupPct}% de vida).`;
+      } else if (!battleMode.allowRelobby && myPerformance.singlePassSurvivalSec < bossProfile.timeLimitSec) {
+        primaryBottleneck = "endurance";
+        bottleneckTitle = `❌ Derrota por Aguante: Tu equipo cae a los ${myPerformance.singlePassSurvivalSec}s`;
+        bottleneckExplanation = `Tus Pokémon reciben demasiado daño de ${bossProfile.fastMove.name} (${myPerformance.avgBossFastDmg} dmg) y ${bossProfile.chargedMove.name} (${myPerformance.avgBossChargedDmg} dmg), cayendo antes de poder aplicar todo su daño.`;
+      } else {
+        primaryBottleneck = "dps_timeout";
+        bottleneckTitle = `⏱️ Derrota por Reloj (Time-Out a los ${bossProfile.timeLimitSec}s · Faltan ${remainingBossHP.toLocaleString()} HP)`;
+        bottleneckExplanation = `El reloj se agota: ${bossSpecies.name} requiere ${requiredGroupDPS} DPS constantes durante ${bossProfile.timeLimitSec}s y vuestro grupo actual genera ${actualGroupDPS} DPS (déficit de ${Math.abs(dpsDelta)} DPS, necesitaríais ${extraSecondsNeeded}s extra).${
+          myPerformance.relobbiesNeeded > 0
+            ? ` Además, tu equipo sufre ~${myPerformance.estimatedFaints} bajas y pierde ~${myPerformance.relobbyTimeLostSec}s en ${myPerformance.relobbiesNeeded} re-entrada(s) al lobby.`
+            : ""
+        }`;
+      }
+    }
+
+    const combatDiagnostics = {
+      requiredGroupDPS,
+      actualGroupDPS,
+      dpsDelta,
+      estimatedTimeToKillSec,
+      timeSpareSec,
+      extraSecondsNeeded,
+      remainingBossHP,
+      singlePassSurvivalSec: myPerformance.singlePassSurvivalSec,
+      singlePassTDO: myPerformance.singlePassTDO,
+      estimatedFaints: myPerformance.estimatedFaints,
+      relobbiesNeeded: myPerformance.relobbiesNeeded,
+      relobbyTimeLostSec: myPerformance.relobbyTimeLostSec,
+      avgFastSharePct: myPerformance.avgFastSharePct,
+      avgChargedSharePct: myPerformance.avgChargedSharePct,
+      avgBossFastDmg: myPerformance.avgBossFastDmg,
+      avgBossChargedDmg: myPerformance.avgBossChargedDmg,
+      maxCyclesCompleted: myPerformance.maxCyclesCompleted,
+      wipeoutBeforeTimer: myPerformance.wipeoutBeforeTimer,
+      wipeoutAtSec: myPerformance.wipeoutAtSec,
+      primaryBottleneck,
+      bottleneckTitle,
+      bottleneckExplanation
+    };
+
+    // 5. Consejos de Mejora de Caja (Subir de nivel, cambiar ataques con MT, mejorar nivel Max)
+    const boxUpgradeAdvice = analyzeBoxRecommendations(
+      myBox,
+      myTeam,
+      evaluatedMyList,
+      bossProfile,
+      battleMode,
+      conditions
+    );
+
     // Frase directa y clara
     let directRecommendation = "";
     const totalCurrentPlayers = 1 + activeFriendsCount + totalRandomCount;
@@ -768,6 +1195,8 @@
           exceedsMaxLobby: totalCurrentPlayers + casualNeeded > battleMode.maxLobbyPlayers
         }
       },
+      combatDiagnostics,
+      boxUpgradeAdvice,
       directRecommendation
     };
   }
@@ -780,6 +1209,7 @@
     evaluateMaxPokemon,
     selectOptimalTeam,
     computeTeamDamage,
+    analyzeBoxRecommendations,
     calculateBattlePlan
   };
 })(typeof window !== "undefined" ? window : globalThis);

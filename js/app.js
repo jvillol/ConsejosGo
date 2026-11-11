@@ -76,6 +76,70 @@
     return db.battleModes[state.selectedBattleModeId] || db.battleModes.raid_t5;
   }
 
+  function persistUiState() {
+    if (!global.PokeBoxManager || !global.PokeBoxManager.saveAppState) return;
+    global.PokeBoxManager.saveAppState({
+      selectedBattleModeId: state.selectedBattleModeId,
+      selectedBossId: state.selectedBossId,
+      partyPowerEnabled: state.partyPowerEnabled,
+      partySize: state.partySize,
+      friendship: state.friendship,
+      megaBonus: state.megaBonus,
+      weatherBoost: state.weatherBoost,
+      randomAlliesHigh: state.randomAlliesHigh,
+      randomAlliesMid: state.randomAlliesMid,
+      randomAlliesLow: state.randomAlliesLow,
+      activeCombatFriendIds: state.activeCombatFriendIds,
+      boxSort: state.boxSort
+    });
+  }
+
+  function restoreUiStateFromCache() {
+    if (!global.PokeBoxManager || !global.PokeBoxManager.loadAppState) return;
+    const saved = global.PokeBoxManager.loadAppState();
+    if (!saved || typeof saved !== "object") return;
+    const db = global.POKE_DB;
+    if (saved.selectedBattleModeId && db.battleModes[saved.selectedBattleModeId]) {
+      state.selectedBattleModeId = saved.selectedBattleModeId;
+    }
+    if (saved.selectedBossId && db.pokemon.some((p) => p.id === saved.selectedBossId)) {
+      state.selectedBossId = saved.selectedBossId;
+    }
+    if (typeof saved.partyPowerEnabled === "boolean") {
+      state.partyPowerEnabled = saved.partyPowerEnabled;
+    }
+    if (saved.partySize && [2, 3, 4].includes(Number(saved.partySize))) {
+      state.partySize = Number(saved.partySize);
+    }
+    if (saved.friendship && db.combatModifiers.friendship[saved.friendship]) {
+      state.friendship = saved.friendship;
+    }
+    if (saved.megaBonus && db.combatModifiers.megaBonus[saved.megaBonus]) {
+      state.megaBonus = saved.megaBonus;
+    }
+    if (typeof saved.weatherBoost === "boolean") {
+      state.weatherBoost = saved.weatherBoost;
+    }
+    if (typeof saved.randomAlliesHigh === "number") {
+      state.randomAlliesHigh = Math.max(0, saved.randomAlliesHigh);
+    }
+    if (typeof saved.randomAlliesMid === "number") {
+      state.randomAlliesMid = Math.max(0, saved.randomAlliesMid);
+    }
+    if (typeof saved.randomAlliesLow === "number") {
+      state.randomAlliesLow = Math.max(0, saved.randomAlliesLow);
+    }
+    if (Array.isArray(saved.activeCombatFriendIds)) {
+      const validFriendIds = new Set(global.PokeBoxManager.getFriends().map((f) => f.id));
+      state.activeCombatFriendIds = saved.activeCombatFriendIds.filter((id) =>
+        validFriendIds.has(id)
+      );
+    }
+    if (saved.boxSort) {
+      state.boxSort = saved.boxSort;
+    }
+  }
+
   function clampAlliesToLobbyLimit(battleMode = getActiveBattleMode()) {
     const maxCompanions = Math.max(0, (battleMode.maxLobbyPlayers || 20) - 1);
 
@@ -754,9 +818,17 @@
       };
 
       if (state.editingUid) {
-        global.PokeBoxManager.update(state.editingUid, payload);
+        const updated = global.PokeBoxManager.update(state.editingUid, payload);
+        showNotification(
+          `✅ ${updated ? updated.nickname : "Pokémon"} actualizado y guardado en caché permanente.`,
+          "info"
+        );
       } else {
-        global.PokeBoxManager.add(payload);
+        const added = global.PokeBoxManager.add(payload);
+        showNotification(
+          `💾 ${added ? added.nickname : "Pokémon"} guardado en caché (${added ? added.levelBadge : ""} · PC ${added ? added.cp : ""}).`,
+          "info"
+        );
       }
 
       resetBoxForm();
@@ -798,9 +870,23 @@
     }
 
     clearBoxBtn.addEventListener("click", () => {
+      const ownerLabel =
+        state.boxSelectedOwner === "me"
+          ? "tu Caja Personal"
+          : state.boxSelectedOwner === "all"
+          ? "TODA la colección (tuya y de tus amigos)"
+          : "el equipo de este amigo";
+      if (
+        !global.confirm(
+          `¿Seguro que quieres vaciar ${ownerLabel}? Tus Pokémon se guardan de forma permanente a menos que confirmes borrarlos aquí.`
+        )
+      ) {
+        return;
+      }
       global.PokeBoxManager.clearAll(state.boxSelectedOwner);
       renderMyBoxCards();
       runOptimizerCalculation();
+      showNotification(`🗑️ Se ha vaciado ${ownerLabel}.`, "warning");
     });
 
     loadDemoBtn.addEventListener("click", () => {
@@ -808,6 +894,10 @@
       populateOwnerSelectors();
       renderMyBoxCards();
       runOptimizerCalculation();
+      showNotification(
+        "⚡ Pokémon de demostración añadidos sin borrar tus Pokémon existentes.",
+        "info"
+      );
     });
 
     const boxSortSelect = document.getElementById("select-box-sort");
@@ -968,10 +1058,24 @@
     const db = global.POKE_DB;
     const allPokemon = global.PokeBoxManager.getAll(state.boxSelectedOwner);
 
-    const myCount = global.PokeBoxManager.getAll("me").length;
-    document.getElementById("header-box-count").textContent = myCount;
+    const totalAllList = global.PokeBoxManager.getAll("all");
+    const myCount = totalAllList.filter((p) => (p.ownerId || "me") === "me").length;
+    const friendsPokeCount = totalAllList.length - myCount;
+    const headerCountEl = document.getElementById("header-box-count");
+    if (headerCountEl) {
+      headerCountEl.textContent =
+        friendsPokeCount > 0 ? `${myCount} (+${friendsPokeCount} 👥)` : `${myCount}`;
+    }
+    const cachePill = document.getElementById("cache-status-pill");
+    if (cachePill && global.PokeBoxManager.getLastSavedTimestamp) {
+      const lastIso = global.PokeBoxManager.getLastSavedTimestamp();
+      if (lastIso) {
+        const dt = new Date(lastIso);
+        cachePill.title = `Guardado automático en caché permanente (localStorage + IndexedDB). Último cambio: ${dt.toLocaleString()}`;
+      }
+    }
     const tabBadge = document.getElementById("tab-box-badge");
-    if (tabBadge) tabBadge.textContent = myCount;
+    if (tabBadge) tabBadge.textContent = totalAllList.length;
 
     const grid = document.getElementById("my-box-cards-grid");
     const q = normalizeSearchText(state.boxFilterQuery);
@@ -1667,6 +1771,7 @@
   }
 
   function runOptimizerCalculation() {
+    persistUiState();
     const allBoxList = global.PokeBoxManager.getAll("all");
     const plan = global.PokeOptimizerEngine.calculateBattlePlan(
       allBoxList,
@@ -1814,7 +1919,18 @@
   }
 
   function renderCalculationResults(plan) {
-    const { personalMetrics, scenarios, team, battleMode, bossProfile, missingMaxWarning, friendsBreakdown, randomMetrics } = plan;
+    const {
+      personalMetrics,
+      scenarios,
+      team,
+      battleMode,
+      bossProfile,
+      missingMaxWarning,
+      friendsBreakdown,
+      randomMetrics,
+      combatDiagnostics,
+      boxUpgradeAdvice
+    } = plan;
 
     // Actualizar resumen visual de Gente Random
     const randomDamageLabel = document.getElementById("random-allies-damage-total");
@@ -1857,6 +1973,125 @@
 
     document.getElementById("direct-recommendation-text").textContent = plan.directRecommendation;
 
+    // =========================================================================
+    // NUEVO: PANEL DE DIAGNÓSTICO EXACTO (¿POR QUÉ GANAS O PIERDES EN DAÑO Y AGUANTE?)
+    // =========================================================================
+    const diagPanel = document.getElementById("combat-diagnostics-panel");
+    if (diagPanel && combatDiagnostics) {
+      const d = combatDiagnostics;
+      const isWin = personalMetrics.canBeatWithFriends;
+      const borderColor = isWin
+        ? d.primaryBottleneck === "endurance_risk"
+          ? "border-amber-500/50 bg-amber-950/20"
+          : "border-emerald-500/40 bg-emerald-950/15"
+        : "border-pink-500/40 bg-slate-950/90";
+
+      const dpsColor = d.dpsDelta >= 0 ? "text-emerald-300" : "text-rose-400";
+      const dpsDeltaSign = d.dpsDelta >= 0 ? `+${d.dpsDelta}` : `${d.dpsDelta}`;
+
+      const timeStatusText = isWin
+        ? `Cae en ~${Math.min(bossProfile.timeLimitSec, d.estimatedTimeToKillSec)}s (sobran ${d.timeSpareSec}s)`
+        : `Faltan ${d.remainingBossHP.toLocaleString()} HP al agotarse los ${bossProfile.timeLimitSec}s`;
+
+      const enduranceStatusText =
+        battleMode.category === "max"
+          ? d.wipeoutBeforeTimer
+            ? `⚠️ Tus 3 Pokémon caen a los ~${d.wipeoutAtSec}s (Sin Re-lobby)`
+            : `✅ Tus 3 Pokémon aguantan los ${bossProfile.timeLimitSec}s (${d.maxCyclesCompleted} fases Max)`
+          : d.relobbiesNeeded > 0
+          ? `~${d.estimatedFaints} bajas · ${d.relobbiesNeeded} Re-lobby (-${d.relobbyTimeLostSec}s)`
+          : `✅ Tu equipo de 6 aguanta sin re-lobby (~${d.estimatedFaints} bajas)`;
+
+      diagPanel.className = `mt-4 p-4 rounded-xl border space-y-3.5 ${borderColor}`;
+      diagPanel.innerHTML = `
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-2.5">
+          <div>
+            <span class="text-[10px] font-mono uppercase tracking-wider text-cyan-400 font-bold block">
+              📊 Explicación Matemática del Resultado (Daño vs Aguante)
+            </span>
+            <h3 class="text-xs sm:text-sm font-extrabold text-white mt-0.5">
+              ${d.bottleneckTitle}
+            </h3>
+          </div>
+          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+            d.dpsDelta >= 0
+              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+              : "bg-rose-500/20 text-rose-300 border border-rose-500/40"
+          }">
+            DPS Grupo: ${d.actualGroupDPS}/s vs ${d.requiredGroupDPS}/s req. (${dpsDeltaSign}/s)
+          </span>
+        </div>
+
+        <p class="text-xs text-slate-300 leading-relaxed">
+          ${d.bottleneckExplanation}
+        </p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+          <!-- Columna 1: Por qué en DAÑO y RELOJ -->
+          <div class="p-3 rounded-xl bg-slate-900/90 border border-cyan-500/30 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-extrabold uppercase tracking-wider text-cyan-300">
+                ⚔️ 1. Por qué en Daño y Reloj
+              </span>
+              <span class="text-[10px] font-mono ${dpsColor} font-bold">${dpsDeltaSign} DPS</span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <div class="flex items-center justify-between">
+                <span class="text-slate-400">DPS Mínimo Exigido:</span>
+                <strong class="font-mono text-white">${d.requiredGroupDPS} HP/s (${bossProfile.hp.toLocaleString()} HP / ${bossProfile.timeLimitSec}s)</strong>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-slate-400">DPS Real de tu Grupo:</span>
+                <strong class="font-mono ${dpsColor}">${d.actualGroupDPS} HP/s (Tú: ${personalMetrics.teamDPS}/s)</strong>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-slate-400">Proyección de Reloj:</span>
+                <strong class="font-mono text-cyan-200">${timeStatusText}</strong>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-slate-400">Origen de tu Daño:</span>
+                <strong class="font-mono text-pink-300">${
+                  battleMode.category === "max"
+                    ? `${d.maxCyclesCompleted} Fases Max + Ataques Rápidos`
+                    : `${d.avgChargedSharePct}% Cargados · ${d.avgFastSharePct}% Rápidos`
+                }</strong>
+              </div>
+            </div>
+          </div>
+
+          <!-- Columna 2: Por qué en AGUANTE y SUPERVIVENCIA -->
+          <div class="p-3 rounded-xl bg-slate-900/90 border border-emerald-500/30 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-extrabold uppercase tracking-wider text-emerald-300">
+                🛡️ 2. Por qué en Aguante y Bajas
+              </span>
+              <span class="text-[10px] font-mono text-emerald-300 font-bold">
+                Aguante: ${d.singlePassSurvivalSec}s
+              </span>
+            </div>
+            <div class="space-y-1.5 text-xs">
+              <div class="flex items-center justify-between">
+                <span class="text-slate-400">Ataque Rápido del Jefe:</span>
+                <strong class="font-mono text-slate-200">${bossProfile.fastMove.name} (~${d.avgBossFastDmg} PS/golpe)</strong>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-slate-400">Ataque Cargado del Jefe:</span>
+                <strong class="font-mono text-rose-300">${bossProfile.chargedMove.name} (~${d.avgBossChargedDmg} PS/golpe)</strong>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-slate-400">Supervivencia de tu Equipo:</span>
+                <strong class="font-mono text-emerald-300">${d.singlePassSurvivalSec}s en pie (${d.singlePassTDO.toLocaleString()} TDO)</strong>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-slate-400">Bajas y Re-entradas:</span>
+                <strong class="font-mono text-amber-300">${enduranceStatusText}</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
     // Sección de desglose de participantes (Yo + Amigos Fijos + Gente Random)
     const friendsContributionWrap = document.getElementById("friends-contribution-summary");
     if (friendsContributionWrap) {
@@ -1877,7 +2112,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
               <div class="p-2 rounded-lg bg-slate-900/80 border border-slate-800 text-xs">
                 <span class="text-slate-400">👤 Tu Equipo Personal:</span>
-                <strong class="text-cyan-300 block font-mono text-sm">${personalMetrics.personalDamagePct}% (${personalMetrics.personalDamage.toLocaleString()} HP)</strong>
+                <strong class="text-cyan-300 block font-mono text-sm">${personalMetrics.personalDamagePct}% (${personalMetrics.personalDamage.toLocaleString()} HP · ${personalMetrics.teamDPS}/s)</strong>
               </div>
               ${friendsBreakdown
                 .map((f) => {
@@ -1887,7 +2122,7 @@
                   return `
                   <div class="p-2 rounded-lg bg-slate-900/80 border border-slate-800 text-xs">
                     <span class="text-slate-400">👥 ${f.friend.name}:</span>
-                    <strong class="text-pink-300 block font-mono text-sm">${f.performance.pct}% (${f.performance.damage.toLocaleString()} HP)</strong>
+                    <strong class="text-pink-300 block font-mono text-sm">${f.performance.pct}% (${f.performance.damage.toLocaleString()} HP · ${f.performance.dps}/s)</strong>
                     ${warning}
                   </div>
                 `;
@@ -1929,15 +2164,15 @@
     const maxBanner = document.getElementById("max-strategy-banner");
 
     if (battleMode.category === "max") {
-      teamTitle.textContent = "Tu Patrulla Ideal de Combate Max (3 Pokémon)";
+      teamTitle.textContent = "Tu Patrulla Ideal de Combate Max (3 Pokémon de tu Caja)";
       teamSubtitle.textContent = missingMaxWarning
         ? "⚠️ No tienes Pokémon marcados como Dinamax/Gigamax en tu caja; mostrando los mejores de tu colección general."
         : "2 Tanques/Generadores de Medidor Max (Fase Normal) + 1 Atacante Explosivo para la Fase Max.";
       maxBanner.classList.remove("hidden");
     } else {
-      teamTitle.textContent = "Tu Equipo Ideal para Incursión (Top 6 Counters)";
+      teamTitle.textContent = "Tu Equipo Ideal Recomendado de tu Caja (Top 6 Counters)";
       teamSubtitle.textContent =
-        "Ordenados automáticamente por su rendimiento real de DPS, eficacia de tipos, Party Power y TDO.";
+        "Seleccionados de tu Caja por su DPS real, eficacia elemental, Party Power y aguante frente a los ataques de este jefe.";
       maxBanner.classList.add("hidden");
     }
 
@@ -1948,94 +2183,411 @@
           Añade Pokémon a tu Caja Personal para ver tu alineación ideal contra este jefe.
         </div>
       `;
+    } else {
+      teamGrid.innerHTML = team
+        .map((item) => {
+          const entry = item.boxEntry;
+          const effBadge =
+            item.bestTypeEff >= 2.5
+              ? `<span class="px-2 py-0.5 rounded font-mono text-[10px] font-extrabold bg-amber-500/25 text-amber-300 border border-amber-500/50">Doble x${item.bestTypeEff}</span>`
+              : item.bestTypeEff > 1.0
+              ? `<span class="px-2 py-0.5 rounded font-mono text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">Eficaz x${item.bestTypeEff}</span>`
+              : `<span class="px-2 py-0.5 rounded font-mono text-[10px] bg-slate-800 text-slate-300">Neutro x${item.bestTypeEff}</span>`;
+
+          const resistBadge =
+            item.bossChargedEff < 0.9
+              ? `<span class="text-emerald-300 font-bold">Resiste cargado (x${item.bossChargedEff})</span>`
+              : item.bossChargedEff > 1.1
+              ? `<span class="text-rose-400 font-bold">Débil al cargado (x${item.bossChargedEff})</span>`
+              : `<span class="text-slate-300">Recibe neutro (x${item.bossChargedEff})</span>`;
+
+          const maxDetailRow =
+            battleMode.category === "max" && item.isMaxEligible
+              ? `<div class="mt-2 pt-2 border-t border-pink-500/20 flex items-center justify-between text-[11px] text-pink-300">
+                  <span>🌀 <strong>${item.maxInfo.moveName}</strong> (Nv. ${item.maxInfo.atkLevel})</span>
+                  <span class="font-mono font-bold">${item.singleMaxHitDamage}x3 = ${item.totalMaxBurstDamage.toLocaleString()} dmg</span>
+                 </div>`
+              : "";
+
+          const realAtk = Math.round(entry.stats.effectiveAtk);
+          const realDef = Math.round(entry.stats.effectiveDef);
+          const realHP = entry.stats.hp;
+
+          return `
+            <div class="p-3.5 sm:p-4 rounded-xl bg-slate-950/90 border border-slate-800 hover:border-pink-500/50 transition flex flex-col justify-between shadow-lg">
+              <div>
+                <div class="flex items-center justify-between gap-2 mb-2.5">
+                  <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border truncate ${item.roleBadgeClass}">
+                    ${item.roleLabel}
+                  </span>
+                  ${effBadge}
+                </div>
+
+                <div class="flex items-center gap-3">
+                  <div class="w-12 h-12 rounded-xl bg-slate-900 border border-slate-700/80 flex items-center justify-center p-1 shrink-0 overflow-hidden shadow-inner">
+                    <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${entry.species.dex}.png" alt="${entry.nickname}" class="w-full h-full object-contain filter drop-shadow" onerror="this.style.display='none'" />
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-baseline justify-between gap-2">
+                      <h4 class="text-sm sm:text-base font-extrabold text-white truncate">
+                        ${entry.nickname}
+                        ${entry.isShadow ? '<span class="text-purple-400 text-xs font-semibold">(Oscuro)</span>' : ""}
+                      </h4>
+                      <span class="font-mono text-xs font-bold text-cyan-300 shrink-0">PC ${entry.cp}</span>
+                    </div>
+                    <div class="text-[11px] font-mono text-slate-400 flex items-center gap-1.5 flex-wrap mt-0.5">
+                      <span>${entry.levelBadge}</span>
+                      <span class="text-slate-600">·</span>
+                      <span class="text-amber-300 font-bold">IV ${entry.ivAtk}/${entry.ivDef}/${entry.ivSta} (${entry.ivPct}%)</span>
+                      <span class="text-slate-600">·</span>
+                      <span class="text-slate-300">ATQ ${realAtk} · DEF ${realDef} · PS ${realHP}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Daño exacto por ataque -->
+                <div class="mt-3 p-2.5 rounded-lg bg-slate-900/80 border border-slate-800/80 space-y-1 text-xs text-slate-300">
+                  <div class="flex items-center justify-between">
+                    <span class="text-slate-400">Rápido (${entry.fastMoveObj.durationMs / 1000}s):</span>
+                    <span class="font-semibold text-slate-200">${entry.fastMoveObj.name} · <strong class="font-mono text-cyan-300">${item.fastDmg} dmg</strong></span>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <span class="text-slate-400">Cargado (~${item.chargedCastsPerLife} usos):</span>
+                    <span class="font-semibold text-cyan-200">${entry.chargedMoveObj.name} · <strong class="font-mono text-pink-300">${item.chargedDmg} dmg</strong></span>
+                  </div>
+                </div>
+
+                <!-- Explicación exacta de Aguante frente al jefe -->
+                <div class="mt-2 px-2.5 py-1.5 rounded-lg bg-slate-900/60 border border-slate-800/70 flex flex-wrap items-center justify-between gap-1 text-[11px]">
+                  <div>
+                    <span class="text-slate-400">Aguante vs Jefe:</span> ${resistBadge}
+                  </div>
+                  <span class="font-mono text-slate-300">
+                    Recibe <strong>${item.bossChargedDmg} PS</strong>/cargado (${
+            item.isOneShotRisk
+              ? '<span class="text-rose-400 font-bold">Riesgo 1-Hit KO</span>'
+              : `aguanta ~${item.chargedHitsSurvived} cargados`
+          })
+                  </span>
+                </div>
+
+                ${maxDetailRow}
+              </div>
+
+              <div class="mt-3 pt-2.5 border-t border-slate-800/90 grid grid-cols-4 text-center font-mono text-xs gap-1">
+                <div class="p-1 rounded bg-slate-900/50">
+                  <span class="block text-[9px] text-slate-400 uppercase tracking-wider font-semibold">DPS</span>
+                  <strong class="text-cyan-300 font-bold">${item.dps}/s</strong>
+                </div>
+                <div class="p-1 rounded bg-slate-900/50">
+                  <span class="block text-[9px] text-slate-400 uppercase tracking-wider font-semibold">TDO</span>
+                  <strong class="text-pink-400 font-bold">${item.tdo}</strong>
+                </div>
+                <div class="p-1 rounded bg-slate-900/50">
+                  <span class="block text-[9px] text-slate-400 uppercase tracking-wider font-semibold">Vida Útil</span>
+                  <strong class="text-emerald-400 font-bold">${item.timeToFaintSec}s</strong>
+                </div>
+                <div class="p-1 rounded bg-slate-900/50">
+                  <span class="block text-[9px] text-slate-400 uppercase tracking-wider font-semibold">Baja Jefe</span>
+                  <strong class="text-amber-300 font-bold">${item.soloBossPct}%</strong>
+                </div>
+              </div>
+            </div>
+          `;
+        })
+        .join("");
+    }
+
+    // =========================================================================
+    // NUEVO: ASESOR DE MEJORA DE TU CAJA (QUÉ SUBIR DE NIVEL, QUÉ MT USAR Y QUÉ MEJORAR)
+    // =========================================================================
+    renderBoxUpgradeAdvisor(boxUpgradeAdvice, bossProfile, battleMode);
+  }
+
+  function renderBoxUpgradeAdvisor(advice, bossProfile, battleMode) {
+    const panel = document.getElementById("box-upgrade-advisor-panel");
+    if (!panel) return;
+
+    const myBoxCount = global.PokeBoxManager.getAll("me").length;
+    if (myBoxCount === 0) {
+      panel.innerHTML = `
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="font-display text-sm sm:text-lg font-extrabold text-cyan-300">
+              🚀 Consejos de Mejora para tu Caja (Subir Nivel y Ataques)
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5">
+              En cuanto guardes Pokémon en tu Caja, aquí verás cuáles te conviene subir de nivel (Nv. 40 / Nv. 50) o cambiar de ataque con MT contra este jefe.
+            </p>
+          </div>
+        </div>
+      `;
       return;
     }
 
-    teamGrid.innerHTML = team
-      .map((item) => {
-        const entry = item.boxEntry;
-        const effBadge =
-          item.bestTypeEff >= 2.5
-            ? `<span class="px-2 py-0.5 rounded font-mono text-[10px] font-extrabold bg-amber-500/25 text-amber-300 border border-amber-500/50">Doble x${item.bestTypeEff}</span>`
-            : item.bestTypeEff > 1.0
-            ? `<span class="px-2 py-0.5 rounded font-mono text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">Eficaz x${item.bestTypeEff}</span>`
-            : `<span class="px-2 py-0.5 rounded font-mono text-[10px] bg-slate-800 text-slate-300">Neutro x${item.bestTypeEff}</span>`;
+    const powerUps = (advice && advice.powerUpAdvices) || [];
+    const moveFixes = (advice && advice.moveChangeAdvices) || [];
+    const maxUpgrades = (advice && advice.maxUpgradeAdvices) || [];
 
-        const maxDetailRow =
-          battleMode.category === "max" && item.isMaxEligible
-            ? `<div class="mt-2 pt-2 border-t border-pink-500/20 flex items-center justify-between text-[11px] text-pink-300">
-                <span>🌀 <strong>${item.maxInfo.moveName}</strong> (Nv. ${item.maxInfo.atkLevel})</span>
-                <span class="font-mono font-bold">${item.totalMaxBurstDamage.toLocaleString()} dmg / Fase Max</span>
-               </div>`
-            : "";
-
-        return `
-          <div class="p-3.5 sm:p-4 rounded-xl bg-slate-950/90 border border-slate-800 hover:border-pink-500/50 transition flex flex-col justify-between shadow-lg">
-            <div>
-              <div class="flex items-center justify-between gap-2 mb-2.5">
-                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border truncate ${item.roleBadgeClass}">
-                  ${item.roleLabel}
-                </span>
-                ${effBadge}
-              </div>
-
-              <div class="flex items-center gap-3">
-                <div class="w-12 h-12 rounded-xl bg-slate-900 border border-slate-700/80 flex items-center justify-center p-1 shrink-0 overflow-hidden shadow-inner">
-                  <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${entry.species.dex}.png" alt="${entry.nickname}" class="w-full h-full object-contain filter drop-shadow" onerror="this.style.display='none'" />
-                </div>
-                <div class="min-w-0 flex-1">
-                  <div class="flex items-baseline justify-between gap-2">
-                    <h4 class="text-sm sm:text-base font-extrabold text-white truncate">
-                      ${entry.nickname}
-                      ${entry.isShadow ? '<span class="text-purple-400 text-xs font-semibold">(Oscuro)</span>' : ""}
-                    </h4>
-                    <span class="font-mono text-xs font-bold text-cyan-300 shrink-0">PC ${entry.cp}</span>
-                  </div>
-                  <div class="text-[11px] font-mono text-slate-400 flex items-center gap-2 mt-0.5">
-                    <span>${entry.levelBadge}</span>
-                    <span class="text-slate-600">·</span>
-                    <span class="text-amber-300 font-bold">IV ${entry.ivPct}%</span>
-                    ${entry.ownerName && entry.ownerName !== "Tú" ? `<span class="text-indigo-300 text-[10px] bg-indigo-950/60 px-1.5 py-0.2 rounded border border-indigo-500/30">👤 ${entry.ownerName}</span>` : ""}
-                  </div>
-                </div>
-              </div>
-
-              <div class="mt-3 p-2.5 rounded-lg bg-slate-900/80 border border-slate-800/80 space-y-1 text-xs text-slate-300">
-                <div class="flex items-center justify-between">
-                  <span class="text-slate-400 flex items-center gap-1">
-                    <span class="text-[10px] px-1 py-0.2 rounded bg-slate-800 text-slate-300 font-mono">Rápido</span>
-                  </span>
-                  <span class="font-semibold text-slate-200">${entry.fastMoveObj.name} <span class="text-slate-500 font-mono text-[10px]">(${entry.fastMoveObj.durationMs / 1000}s)</span></span>
-                </div>
-                <div class="flex items-center justify-between">
-                  <span class="text-slate-400 flex items-center gap-1">
-                    <span class="text-[10px] px-1 py-0.2 rounded bg-slate-800 text-slate-300 font-mono">Cargado</span>
-                  </span>
-                  <span class="font-semibold text-cyan-200">${entry.chargedMoveObj.name}</span>
-                </div>
-              </div>
-
-              ${maxDetailRow}
-            </div>
-
-            <div class="mt-3 pt-2.5 border-t border-slate-800/90 grid grid-cols-3 text-center font-mono text-xs">
-              <div class="p-1 rounded bg-slate-900/50">
-                <span class="block text-[10px] text-slate-400 uppercase tracking-wider font-semibold">DPS</span>
-                <strong class="text-cyan-300 font-bold">${item.dps}/s</strong>
-              </div>
-              <div class="p-1 rounded bg-slate-900/50">
-                <span class="block text-[10px] text-slate-400 uppercase tracking-wider font-semibold">TDO</span>
-                <strong class="text-pink-400 font-bold">${item.tdo}</strong>
-              </div>
-              <div class="p-1 rounded bg-slate-900/50">
-                <span class="block text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Aguante</span>
-                <strong class="text-emerald-400 font-bold">${item.timeToFaintSec}s</strong>
-              </div>
-            </div>
+    if (powerUps.length === 0 && moveFixes.length === 0 && maxUpgrades.length === 0) {
+      panel.innerHTML = `
+        <div class="flex items-center justify-between gap-2">
+          <div>
+            <h2 class="font-display text-sm sm:text-lg font-extrabold text-emerald-300">
+              🚀 ¡Tu Caja ya está Optimizada al Máximo contra ${bossProfile.species.name}!
+            </h2>
+            <p class="text-xs text-slate-300 mt-1">
+              Tus mejores counters para este jefe ya están a Nivel 50, con sus mejores ataques rápidos/cargados y movimientos Max al máximo.
+            </p>
           </div>
-        `;
-      })
-      .join("");
+        </div>
+      `;
+      return;
+    }
+
+    const powerUpHtml =
+      powerUps.length > 0
+        ? `
+        <div class="space-y-2.5">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-extrabold uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
+              <span>⬆️ 1. Pokémon de tu Caja que te Conviene Subir de Nivel (Más Daño y Aguante)</span>
+            </h3>
+            <span class="text-[10px] font-mono text-slate-400">Cálculo exacto con tus IVs</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            ${powerUps
+              .map(
+                (p) => `
+              <div class="p-3 rounded-xl bg-slate-950/90 border ${
+                p.isBenchGem ? "border-amber-500/50" : "border-cyan-500/30"
+              } flex flex-col justify-between gap-2">
+                <div>
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.dex}.png" alt="${p.nickname}" class="w-9 h-9 object-contain shrink-0" onerror="this.style.display='none'" />
+                      <div class="min-w-0">
+                        <span class="text-xs sm:text-sm font-extrabold text-white block truncate">${p.nickname}</span>
+                        <span class="text-[10px] font-mono ${
+                          p.isBenchGem ? "text-amber-300 font-bold" : "text-cyan-400"
+                        }">
+                          ${p.isBenchGem ? "💎 Joya en Banquillo (Entra al Top si lo subes)" : "⬆️ Titular en tu Equipo Actual"}
+                        </span>
+                      </div>
+                    </div>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shrink-0">
+                      +${p.dpsPctGain}% DPS
+                    </span>
+                  </div>
+
+                  <div class="mt-2 p-2 rounded-lg bg-slate-900/90 border border-slate-800 text-[11px] space-y-1 font-mono">
+                    <div class="flex items-center justify-between">
+                      <span class="text-slate-400">Nivel y PC:</span>
+                      <span class="text-white">Nv. ${p.currentLevel} (PC ${p.currentCP}) ➔ <strong class="text-cyan-300">Nv. ${p.targetLevel} (PC ${p.targetCP})</strong></span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                      <span class="text-slate-400">Ganancia Daño:</span>
+                      <span class="text-emerald-300 font-bold">${p.oldDPS}/s ➔ ${p.newDPS}/s (+${p.dpsGain}/s)</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                      <span class="text-slate-400">Ganancia Aguante:</span>
+                      <span class="text-pink-300">+${p.tdoGain} TDO (+${p.survivalGainSec}s vivo · +${p.extraBossPct}% jefe)</span>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  data-apply-powerup-uid="${p.uid}"
+                  data-target-level="${p.targetLevel}"
+                  data-target-cp="${p.targetCP}"
+                  class="w-full py-1.5 px-3 rounded-lg text-xs font-bold bg-cyan-500/20 hover:bg-cyan-500/35 text-cyan-200 border border-cyan-500/40 transition cursor-pointer"
+                >
+                  ⬆️ Actualizar a Nv. ${p.targetLevel} (PC ${p.targetCP}) en mi Caja
+                </button>
+              </div>
+            `
+              )
+              .join("")}
+          </div>
+        </div>
+      `
+        : "";
+
+    const moveFixHtml =
+      moveFixes.length > 0
+        ? `
+        <div class="space-y-2.5 pt-2 border-t border-slate-800">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-extrabold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+              <span>🔧 2. Cambios de Ataque con MT Recomendados en tu Caja</span>
+            </h3>
+            <span class="text-[10px] font-mono text-slate-400">Mejora inmediata sin Polvo Estelar</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            ${moveFixes
+              .map(
+                (m) => `
+              <div class="p-3 rounded-xl bg-slate-950/90 border border-amber-500/40 flex flex-col justify-between gap-2">
+                <div>
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${m.dex}.png" alt="${m.nickname}" class="w-8 h-8 object-contain shrink-0" onerror="this.style.display='none'" />
+                      <strong class="text-xs sm:text-sm text-white truncate">${m.nickname}</strong>
+                    </div>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0">
+                      +${m.dpsGain}/s (+${m.pctGain}%)
+                    </span>
+                  </div>
+                  <p class="text-[11px] text-slate-400 mt-1 leading-snug">${m.reason}</p>
+                  <div class="mt-2 p-2 rounded-lg bg-slate-900 border border-slate-800 text-[11px] font-mono space-y-0.5">
+                    <div class="text-slate-400">Actual: <span class="text-rose-300">${m.currentFastName} / ${m.currentChargedName}</span> (${m.oldDPS}/s)</div>
+                    <div class="text-slate-300">Ideal: <strong class="text-emerald-300">${m.recommendedFastName} / ${m.recommendedChargedName}</strong> (${m.newDPS}/s)</div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  data-apply-moves-uid="${m.uid}"
+                  data-fast-id="${m.recommendedFastId}"
+                  data-charged-id="${m.recommendedChargedId}"
+                  class="w-full py-1.5 px-3 rounded-lg text-xs font-bold bg-amber-500/20 hover:bg-amber-500/35 text-amber-200 border border-amber-500/40 transition cursor-pointer"
+                >
+                  🔧 Aplicar ${m.recommendedFastName} + ${m.recommendedChargedName}
+                </button>
+              </div>
+            `
+              )
+              .join("")}
+          </div>
+        </div>
+      `
+        : "";
+
+    const maxUpgradeHtml =
+      maxUpgrades.length > 0
+        ? `
+        <div class="space-y-2.5 pt-2 border-t border-slate-800">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-extrabold uppercase tracking-wider text-pink-300 flex items-center gap-1.5">
+              <span>🌀 3. Mejoras de Movimiento Max (Dinamax / Gigamax)</span>
+            </h3>
+            <span class="text-[10px] font-mono text-slate-400">Partículas Max</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            ${maxUpgrades
+              .map(
+                (mx) => `
+              <div class="p-3 rounded-xl bg-slate-950/90 border border-pink-500/40 flex flex-col justify-between gap-2">
+                <div>
+                  <div class="flex items-center justify-between gap-2">
+                    <strong class="text-xs sm:text-sm text-white truncate">${mx.nickname} (${mx.moveName})</strong>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-pink-500/20 text-pink-300 border border-pink-500/40">
+                      Nv. ${mx.currentAtkLevel} ➔ Nv. 3
+                    </span>
+                  </div>
+                  <p class="text-[11px] font-mono text-slate-300 mt-1.5">
+                    Daño por Fase Max: <span class="text-slate-400">${mx.oldBurst}</span> ➔ <strong class="text-pink-300">${mx.newBurst} dmg (+${mx.burstGain} dmg / +${mx.dpsGain}/s)</strong>
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  data-apply-maxlv-uid="${mx.uid}"
+                  class="w-full py-1.5 px-3 rounded-lg text-xs font-bold bg-pink-500/20 hover:bg-pink-500/35 text-pink-200 border border-pink-500/40 transition cursor-pointer"
+                >
+                  🌀 Subir Ataque Max a Nivel 3 en mi Caja
+                </button>
+              </div>
+            `
+              )
+              .join("")}
+          </div>
+        </div>
+      `
+        : "";
+
+    panel.innerHTML = `
+      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+        <div>
+          <span class="text-[10px] font-mono uppercase tracking-widest text-cyan-400 font-bold block">
+             Entrenador Inteligente de Colección
+          </span>
+          <h2 class="font-display text-sm sm:text-lg font-extrabold text-white mt-0.5">
+            🚀 Consejos de tu Caja contra ${bossProfile.species.name}: ¿Qué Subir de Nivel o Cambiar?
+          </h2>
+        </div>
+      </div>
+      ${powerUpHtml}
+      ${moveFixHtml}
+      ${maxUpgradeHtml}
+    `;
+
+    // Conectar botones de 1 clic para aplicar subidas de nivel en la caja
+    panel.querySelectorAll("[data-apply-powerup-uid]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const uid = btn.getAttribute("data-apply-powerup-uid");
+        const targetLevel = Number(btn.getAttribute("data-target-level"));
+        const targetCP = Number(btn.getAttribute("data-target-cp"));
+        const existing = global.PokeBoxManager.getByUid(uid);
+        if (!existing) return;
+
+        global.PokeBoxManager.update(uid, {
+          ...existing,
+          level: targetLevel,
+          levelPreset: targetLevel >= 50 ? "maxed" : "no_xl",
+          cp: targetCP,
+          customCP: targetCP
+        });
+        renderMyBoxCards();
+        runOptimizerCalculation();
+        showNotification(
+          `⬆️ ¡${existing.nickname} subido a Nv. ${targetLevel} (PC ${targetCP}) y guardado en caché!`,
+          "info"
+        );
+      });
+    });
+
+    // Conectar botones de 1 clic para aplicar cambios de ataque con MT
+    panel.querySelectorAll("[data-apply-moves-uid]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const uid = btn.getAttribute("data-apply-moves-uid");
+        const fastId = btn.getAttribute("data-fast-id");
+        const chargedId = btn.getAttribute("data-charged-id");
+        const existing = global.PokeBoxManager.getByUid(uid);
+        if (!existing) return;
+
+        global.PokeBoxManager.update(uid, {
+          ...existing,
+          fastMove: fastId,
+          chargedMove: chargedId
+        });
+        renderMyBoxCards();
+        runOptimizerCalculation();
+        showNotification(
+          `🔧 ¡Ataques de ${existing.nickname} actualizados y guardados en caché!`,
+          "info"
+        );
+      });
+    });
+
+    // Conectar botones de 1 clic para subir Ataque Max a Nivel 3
+    panel.querySelectorAll("[data-apply-maxlv-uid]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const uid = btn.getAttribute("data-apply-maxlv-uid");
+        const existing = global.PokeBoxManager.getByUid(uid);
+        if (!existing) return;
+
+        global.PokeBoxManager.update(uid, {
+          ...existing,
+          maxAttackLevel: 3
+        });
+        renderMyBoxCards();
+        runOptimizerCalculation();
+        showNotification(
+          `🌀 ¡Ataque Max de ${existing.nickname} subido a Nivel 3 y guardado en caché!`,
+          "info"
+        );
+      });
+    });
   }
 
   // ==========================================================================
@@ -2188,6 +2740,7 @@
 
   document.addEventListener("DOMContentLoaded", () => {
     global.POKE_APP_INITIALIZED = true;
+    restoreUiStateFromCache();
     initTabs();
     initBoxForm();
     initFriendModalEvents();
@@ -2196,5 +2749,20 @@
     initPokedexSearch();
     renderMyBoxCards();
     runOptimizerCalculation();
+
+    if (global.PokeBoxManager && global.PokeBoxManager.syncPersistentCache) {
+      global.PokeBoxManager.syncPersistentCache().then((restoredFromIDB) => {
+        if (restoredFromIDB) {
+          restoreUiStateFromCache();
+          populateOwnerSelectors();
+          renderMyBoxCards();
+          runOptimizerCalculation();
+          showNotification(
+            "💾 Se han restaurado tus Pokémon y amigos desde la caché de respaldo del navegador.",
+            "info"
+          );
+        }
+      });
+    }
   });
 })(typeof window !== "undefined" ? window : globalThis);

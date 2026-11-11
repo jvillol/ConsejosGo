@@ -12,7 +12,76 @@
   "use strict";
 
   const STORAGE_KEY_BOX = "pokeraid_max_optimizer_box_v3";
+  const LEGACY_BOX_KEYS = [
+    "pokeraid_max_optimizer_box_v2",
+    "pokeraid_max_optimizer_box_v1",
+    "pokeraid_box"
+  ];
   const STORAGE_KEY_FRIENDS = "pokeraid_max_optimizer_friends_v2";
+  const LEGACY_FRIENDS_KEYS = [
+    "pokeraid_max_optimizer_friends_v1",
+    "pokeraid_friends"
+  ];
+  const STORAGE_KEY_APP_STATE = "pokeraid_max_optimizer_ui_state_v1";
+  const STORAGE_KEY_LAST_SAVED = "pokeraid_max_optimizer_last_saved_at";
+
+  const IDB_NAME = "PokeRaidMaxOptimizerCacheDB";
+  const IDB_STORE = "kv_cache";
+
+  function openCacheIDB() {
+    return new Promise((resolve) => {
+      if (!global.indexedDB) {
+        resolve(null);
+        return;
+      }
+      try {
+        const req = global.indexedDB.open(IDB_NAME, 1);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(IDB_STORE)) {
+            db.createObjectStore(IDB_STORE);
+          }
+        };
+        req.onsuccess = (e) => resolve(e.target.result);
+        req.onerror = () => resolve(null);
+      } catch (_) {
+        resolve(null);
+      }
+    });
+  }
+
+  function writeToIDBMirror(key, value) {
+    openCacheIDB().then((db) => {
+      if (!db) return;
+      try {
+        const tx = db.transaction(IDB_STORE, "readwrite");
+        tx.objectStore(IDB_STORE).put(value, key);
+      } catch (_) {}
+    });
+  }
+
+  function readFromIDBMirror(key) {
+    return openCacheIDB().then((db) => {
+      if (!db) return null;
+      return new Promise((resolve) => {
+        try {
+          const tx = db.transaction(IDB_STORE, "readonly");
+          const req = tx.objectStore(IDB_STORE).get(key);
+          req.onsuccess = () => resolve(req.result ?? null);
+          req.onerror = () => resolve(null);
+        } catch (_) {
+          resolve(null);
+        }
+      });
+    });
+  }
+
+  // Solicitar almacenamiento persistente al navegador para evitar borrado automático de caché
+  if (global.navigator && global.navigator.storage && global.navigator.storage.persist) {
+    try {
+      global.navigator.storage.persist().catch(() => {});
+    } catch (_) {}
+  }
 
   // Tabla base oficial de CPM para niveles enteros 1 a 40
   const BASE_CPMS = {
@@ -301,12 +370,31 @@
     };
   }
 
+  function touchLastSavedTimestamp() {
+    try {
+      const iso = new Date().toISOString();
+      global.localStorage.setItem(STORAGE_KEY_LAST_SAVED, iso);
+      writeToIDBMirror(STORAGE_KEY_LAST_SAVED, iso);
+    } catch (_) {}
+  }
+
   function loadRawBox() {
     try {
-      const raw = global.localStorage.getItem(STORAGE_KEY_BOX);
+      let raw = global.localStorage.getItem(STORAGE_KEY_BOX);
       if (!raw) {
-        // La caja parte completamente vacía (0 Pokémon) a petición del usuario
-        saveRawBox([]);
+        // Intentar migrar automáticamente de versiones anteriores (v2 / v1) para no perder nunca datos previos
+        for (const legacyKey of LEGACY_BOX_KEYS) {
+          const legacyRaw = global.localStorage.getItem(legacyKey);
+          if (legacyRaw) {
+            try {
+              const legacyParsed = JSON.parse(legacyRaw);
+              if (Array.isArray(legacyParsed) && legacyParsed.length > 0) {
+                saveRawBox(legacyParsed);
+                return legacyParsed;
+              }
+            } catch (_) {}
+          }
+        }
         return [];
       }
       const parsed = JSON.parse(raw);
@@ -319,7 +407,10 @@
 
   function saveRawBox(list) {
     try {
-      global.localStorage.setItem(STORAGE_KEY_BOX, JSON.stringify(list));
+      const safeList = Array.isArray(list) ? list : [];
+      global.localStorage.setItem(STORAGE_KEY_BOX, JSON.stringify(safeList));
+      writeToIDBMirror(STORAGE_KEY_BOX, safeList);
+      touchLastSavedTimestamp();
     } catch (err) {
       console.error("Error guardando Mi Caja en localStorage:", err);
     }
@@ -347,8 +438,18 @@
     try {
       const raw = global.localStorage.getItem(STORAGE_KEY_FRIENDS);
       if (!raw) {
-        // La lista de amigos parte limpia desde cero (0 amigos fijos)
-        saveRawFriends([]);
+        for (const legacyKey of LEGACY_FRIENDS_KEYS) {
+          const legacyRaw = global.localStorage.getItem(legacyKey);
+          if (legacyRaw) {
+            try {
+              const legacyParsed = JSON.parse(legacyRaw);
+              if (Array.isArray(legacyParsed) && legacyParsed.length > 0) {
+                saveRawFriends(legacyParsed);
+                return legacyParsed;
+              }
+            } catch (_) {}
+          }
+        }
         return [];
       }
       const parsed = JSON.parse(raw);
@@ -361,7 +462,10 @@
 
   function saveRawFriends(list) {
     try {
-      global.localStorage.setItem(STORAGE_KEY_FRIENDS, JSON.stringify(list));
+      const safeList = Array.isArray(list) ? list : [];
+      global.localStorage.setItem(STORAGE_KEY_FRIENDS, JSON.stringify(safeList));
+      writeToIDBMirror(STORAGE_KEY_FRIENDS, safeList);
+      touchLastSavedTimestamp();
     } catch (err) {
       console.error("Error guardando Amigos en localStorage:", err);
     }
@@ -603,8 +707,74 @@
         }
       }
 
-      saveRawBox(demoClone);
+      // Fusionar los Pokémon demo con los que el usuario ya tenga guardados para no borrar nunca su colección previa
+      const existingBox = loadRawBox();
+      const existingUids = new Set(existingBox.map((p) => p.uid));
+      const mergedBox = [...existingBox];
+      for (const item of demoClone) {
+        if (!existingUids.has(item.uid)) {
+          mergedBox.push(item);
+        }
+      }
+
+      saveRawBox(mergedBox);
       return this.getAll();
+    },
+
+    /**
+     * Sincroniza y recupera automáticamente desde IndexedDB si localStorage se vació accidentalmente,
+     * o respalda localStorage en IndexedDB si ya tiene datos.
+     */
+    async syncPersistentCache() {
+      const currentBox = loadRawBox();
+      const currentFriends = loadRawFriends();
+      let restored = false;
+
+      if (currentBox.length === 0) {
+        const idbBox = await readFromIDBMirror(STORAGE_KEY_BOX);
+        if (Array.isArray(idbBox) && idbBox.length > 0) {
+          global.localStorage.setItem(STORAGE_KEY_BOX, JSON.stringify(idbBox));
+          restored = true;
+        }
+      } else {
+        writeToIDBMirror(STORAGE_KEY_BOX, currentBox);
+      }
+
+      if (currentFriends.length === 0) {
+        const idbFriends = await readFromIDBMirror(STORAGE_KEY_FRIENDS);
+        if (Array.isArray(idbFriends) && idbFriends.length > 0) {
+          global.localStorage.setItem(STORAGE_KEY_FRIENDS, JSON.stringify(idbFriends));
+          restored = true;
+        }
+      } else {
+        writeToIDBMirror(STORAGE_KEY_FRIENDS, currentFriends);
+      }
+
+      return restored;
+    },
+
+    getLastSavedTimestamp() {
+      try {
+        return global.localStorage.getItem(STORAGE_KEY_LAST_SAVED) || null;
+      } catch (_) {
+        return null;
+      }
+    },
+
+    saveAppState(stateSnapshot) {
+      try {
+        global.localStorage.setItem(STORAGE_KEY_APP_STATE, JSON.stringify(stateSnapshot));
+        writeToIDBMirror(STORAGE_KEY_APP_STATE, stateSnapshot);
+      } catch (_) {}
+    },
+
+    loadAppState() {
+      try {
+        const raw = global.localStorage.getItem(STORAGE_KEY_APP_STATE);
+        return raw ? JSON.parse(raw) : null;
+      } catch (_) {
+        return null;
+      }
     },
 
     // ========================================================================
